@@ -213,13 +213,20 @@ func buildNonInteractiveResult(cmd *cobra.Command) tui.InitResult {
 		llmModel = llmDefaults.Model
 	}
 
+	// Use the user-provided endpoint for LLM too; fall back to default only
+	// when the user didn't supply one (i.e. endpoint came from embedder defaults).
+	llmEndpoint := endpoint
+	if llmEndpoint == embedDefaults.Endpoint {
+		llmEndpoint = llmDefaults.Endpoint
+	}
+
 	return tui.InitResult{
 		Provider:    provider,
 		Model:       model,
 		Endpoint:    endpoint,
 		APIKey:      apiKey,
 		LLMModel:    llmModel,
-		LLMEndpoint: llmDefaults.Endpoint,
+		LLMEndpoint: llmEndpoint,
 		Done:        true,
 	}
 }

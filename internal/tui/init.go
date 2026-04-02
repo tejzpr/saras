@@ -356,8 +356,7 @@ func (m InitModel) updateLLMModel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			val = m.llmInput.Placeholder
 		}
 		m.result.LLMModel = val
-		llmDefaults := config.DefaultLLMForProvider(m.result.Provider)
-		m.result.LLMEndpoint = llmDefaults.Endpoint
+		m.result.LLMEndpoint = m.resolveLLMEndpoint()
 		m.llmInput.Blur()
 		m.step = stepConfirm
 		return m, nil
@@ -388,12 +387,23 @@ func (m InitModel) updateLLMModelList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.llmInput.Focus()
 			return m, textinput.Blink
 		}
-		llmDefaults := config.DefaultLLMForProvider(m.result.Provider)
-		m.result.LLMEndpoint = llmDefaults.Endpoint
+		m.result.LLMEndpoint = m.resolveLLMEndpoint()
 		m.step = stepConfirm
 		return m, nil
 	}
 	return m, nil
+}
+
+// resolveLLMEndpoint returns the user-provided endpoint for the LLM.
+// Falls back to the provider default only when the user's endpoint matches
+// the embedder default (i.e. the user didn't supply a custom one).
+func (m InitModel) resolveLLMEndpoint() string {
+	embedDefaults := config.DefaultEmbedderForProvider(m.result.Provider)
+	if m.result.Endpoint != "" && m.result.Endpoint != embedDefaults.Endpoint {
+		return m.result.Endpoint
+	}
+	llmDefaults := config.DefaultLLMForProvider(m.result.Provider)
+	return llmDefaults.Endpoint
 }
 
 func (m InitModel) updateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
