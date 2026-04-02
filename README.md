@@ -150,6 +150,13 @@ saras install skill --copilot     # .github/skills/<project>/SKILL.md + .github/
 
 The skill name and folder are derived from the current directory name so they match the project.
 
+Use `--global` to install the skill to your home directory (`~/.cursor/`, `~/.windsurf/`, etc.) so it's available across all projects:
+
+```bash
+saras install skill --windsurf --global   # ~/.windsurf/skills/<project>/SKILL.md
+saras install skill --cursor --global     # ~/.cursor/skills/<project>/SKILL.md + rules
+```
+
 ### Install AGENTS.md
 
 Generate LLM-powered per-directory `AGENTS.md` files that describe each package's purpose, symbols, and conventions:

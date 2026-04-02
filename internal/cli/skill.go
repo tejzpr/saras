@@ -18,11 +18,12 @@ import (
 func init() {
 	rootCmd.AddCommand(installCmd)
 	installCmd.AddCommand(installSkillCmd)
-	installSkillCmd.Flags().Bool("cursor", false, "Install skill and rule for Cursor (.cursor/skills/<project>/SKILL.md + .cursor/rules/<project>.mdc)")
-	installSkillCmd.Flags().Bool("windsurf", false, "Install skill for Windsurf (.windsurf/skills/<project>/SKILL.md)")
-	installSkillCmd.Flags().Bool("claude", false, "Install skill for Claude Code (.claude/skills/<project>/SKILL.md)")
-	installSkillCmd.Flags().Bool("codex", false, "Install skill for OpenAI Codex (.agents/skills/<project>/SKILL.md)")
-	installSkillCmd.Flags().Bool("copilot", false, "Install skill for GitHub Copilot (.github/skills/<project>/SKILL.md + .github/copilot-instructions.md)")
+	installSkillCmd.Flags().Bool("cursor", false, "Install skill and rule for Cursor")
+	installSkillCmd.Flags().Bool("windsurf", false, "Install skill for Windsurf")
+	installSkillCmd.Flags().Bool("claude", false, "Install skill for Claude Code")
+	installSkillCmd.Flags().Bool("codex", false, "Install skill for OpenAI Codex")
+	installSkillCmd.Flags().Bool("copilot", false, "Install skill for GitHub Copilot")
+	installSkillCmd.Flags().Bool("global", false, "Install skill globally to ~/.ide/ instead of the project directory")
 }
 
 var installCmd = &cobra.Command{
@@ -47,9 +48,13 @@ Pass one or more editor flags to specify which agents to install for:
   --codex      .agents/skills/<project>/SKILL.md
   --copilot    .github/skills/<project>/SKILL.md + .github/copilot-instructions.md
 
+By default, skills are installed in the current project directory. Use --global
+to install to the user's home directory (~/.cursor/, ~/.windsurf/, etc.) so the
+skill is available across all projects.
+
 Examples:
   saras install skill --claude
-  saras install skill --cursor
+  saras install skill --cursor --global
   saras install skill --windsurf --codex`,
 	RunE: runInstallSkill,
 }
@@ -68,25 +73,37 @@ func runInstallSkill(cmd *cobra.Command, args []string) error {
 
 	projectName := filepath.Base(cwd)
 
+	global, _ := cmd.Flags().GetBool("global")
+
+	// Determine base directory: project-local (cwd) or global (~/)
+	baseDir := cwd
+	if global {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("get home directory: %w", err)
+		}
+		baseDir = home
+	}
+
 	editors := []editorSkill{
-		{"claude", filepath.Join(cwd, ".claude", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
-		{"codex", filepath.Join(cwd, ".agents", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
-		{"windsurf", filepath.Join(cwd, ".windsurf", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
-		{"cursor", filepath.Join(cwd, ".cursor", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
-		{"copilot", filepath.Join(cwd, ".github", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
+		{"claude", filepath.Join(baseDir, ".claude", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
+		{"codex", filepath.Join(baseDir, ".agents", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
+		{"windsurf", filepath.Join(baseDir, ".windsurf", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
+		{"cursor", filepath.Join(baseDir, ".cursor", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
+		{"copilot", filepath.Join(baseDir, ".github", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
 	}
 
 	// Cursor also gets a rule file (.mdc) in addition to the skill
 	cursorRule := editorSkill{
 		"cursor",
-		filepath.Join(cwd, ".cursor", "rules", projectName+".mdc"),
+		filepath.Join(baseDir, ".cursor", "rules", projectName+".mdc"),
 		skillContentCursor(),
 	}
 
 	// Copilot also gets a copilot-instructions.md in addition to the skill
 	copilotInstructions := editorSkill{
 		"copilot",
-		filepath.Join(cwd, ".github", "copilot-instructions.md"),
+		filepath.Join(baseDir, ".github", "copilot-instructions.md"),
 		"",
 	}
 
