@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 	"github.com/tejzpr/saras/internal/architect"
 	"github.com/tejzpr/saras/internal/ask"
@@ -169,15 +170,27 @@ func runAskPlain(cmd *cobra.Command, pipeline *ask.Pipeline, opts ask.AskOptions
 		return fmt.Errorf("ask: %w", err)
 	}
 
-	out := cmd.OutOrStdout()
+	var buf strings.Builder
 	for chunk := range ch {
 		if chunk.Err != nil {
 			return fmt.Errorf("ask: %w", chunk.Err)
 		}
-		fmt.Fprint(out, chunk.Content)
+		buf.WriteString(chunk.Content)
 	}
-	fmt.Fprintln(out)
+
+	width := terminalWidth()
+	rendered := tui.RenderMarkdown(buf.String(), width)
+	fmt.Fprint(cmd.OutOrStdout(), rendered)
 	return nil
+}
+
+// terminalWidth returns the current terminal width, or 80 as fallback.
+func terminalWidth() int {
+	w, _, err := term.GetSize(os.Stdout.Fd())
+	if err != nil || w <= 0 {
+		return 80
+	}
+	return w
 }
 
 func runAskTUI(cmd *cobra.Command, pipeline *ask.Pipeline, opts ask.AskOptions) error {

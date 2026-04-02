@@ -279,14 +279,17 @@ func runFlowExplain(cmd *cobra.Command, args []string) error {
 }
 
 func flowExplainPlain(ch <-chan ask.StreamChunk, cmd *cobra.Command) error {
-	out := cmd.OutOrStdout()
+	var buf strings.Builder
 	for chunk := range ch {
 		if chunk.Err != nil {
 			return fmt.Errorf("explain: %w", chunk.Err)
 		}
-		fmt.Fprint(out, chunk.Content)
+		buf.WriteString(chunk.Content)
 	}
-	fmt.Fprintln(out)
+
+	width := terminalWidth()
+	rendered := tui.RenderMarkdown(buf.String(), width)
+	fmt.Fprint(cmd.OutOrStdout(), rendered)
 	return nil
 }
 

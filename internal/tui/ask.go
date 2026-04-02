@@ -109,8 +109,13 @@ func (m AskModel) View() string {
 		return b.String()
 	}
 
-	// Response content with scrolling
+	// Response content with scrolling (render markdown)
 	content := m.response.String()
+	renderWidth := m.width - 4 // account for indentation
+	if renderWidth < 40 {
+		renderWidth = 80
+	}
+	content = RenderMarkdown(content, renderWidth)
 	lines := strings.Split(content, "\n")
 
 	visibleLines := m.visibleLines()
