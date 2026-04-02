@@ -7,9 +7,18 @@
   <a href="https://github.com/tejzpr/saras/releases"><img src="https://img.shields.io/github/v/release/tejzpr/saras?style=flat" alt="Release"></a>
 </p>
 
-**Codebase intelligence tool** — semantic search, RAG-powered Q&A, symbol tracing, and architecture mapping for your code.
+**Codebase intelligence for AI agents and developers** — reduce LLM context length by giving your agent precise, relevant code instead of entire files.
 
-Saras indexes your codebase into vector embeddings and provides powerful tools for understanding, navigating, and querying code using natural language.
+Saras indexes your codebase into vector embeddings and exposes semantic search, RAG-powered Q&A, symbol tracing, and architecture mapping — all accessible via CLI or [MCP](https://modelcontextprotocol.io/). Instead of stuffing thousands of lines into an LLM's context window, agents can query saras to retrieve only the symbols, definitions, and code paths they actually need.
+
+## Why Saras?
+
+AI coding agents today hit context window limits fast. A single "explain how auth works" prompt can pull in dozens of files. Saras solves this by acting as a **local codebase knowledge layer**:
+
+- **Smaller context, better answers** — Agents retrieve targeted code chunks via semantic search instead of dumping whole files into the prompt
+- **Symbol-level precision** — Trace a function's callers/callees across your entire codebase without loading everything into context
+- **Architecture-aware** — Agents can get a structural overview of the project in a few hundred tokens instead of browsing every directory
+- **Works with any LLM** — Ollama, LM Studio, OpenAI, or any OpenAI-compatible endpoint
 
 ## Features
 
