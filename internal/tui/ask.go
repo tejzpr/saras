@@ -30,14 +30,27 @@ type AskModel struct {
 	width    int
 	height   int
 	scroll   int
+	stylize  bool
 }
 
 // NewAskModel creates a new ask TUI model.
+// Markdown rendering in the TUI is enabled by default (human-facing).
 func NewAskModel(query string) AskModel {
 	return AskModel{
 		query:    query,
 		response: &strings.Builder{},
 		loading:  true,
+		stylize:  true,
+	}
+}
+
+// NewAskModelWithStyle creates a new ask TUI model with explicit stylize control.
+func NewAskModelWithStyle(query string, stylize bool) AskModel {
+	return AskModel{
+		query:    query,
+		response: &strings.Builder{},
+		loading:  true,
+		stylize:  stylize,
 	}
 }
 
@@ -109,13 +122,15 @@ func (m AskModel) View() string {
 		return b.String()
 	}
 
-	// Response content with scrolling (render markdown)
+	// Response content with scrolling
 	content := m.response.String()
-	renderWidth := m.width - 4 // account for indentation
-	if renderWidth < 40 {
-		renderWidth = 80
+	if m.stylize {
+		renderWidth := m.width - 4 // account for indentation
+		if renderWidth < 40 {
+			renderWidth = 80
+		}
+		content = RenderMarkdown(content, renderWidth)
 	}
-	content = RenderMarkdown(content, renderWidth)
 	lines := strings.Split(content, "\n")
 
 	visibleLines := m.visibleLines()

@@ -14,10 +14,11 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tejzpr/saras/internal/lang"
 	"github.com/tejzpr/saras/internal/trace"
 )
 
-// PackageInfo describes a Go package in the project.
+// PackageInfo describes a package/module/directory in the project.
 type PackageInfo struct {
 	Name       string   `json:"name"`
 	Path       string   `json:"path"`
@@ -211,7 +212,7 @@ func (m *Mapper) discoverPackages(ctx context.Context) ([]PackageInfo, error) {
 			return nil
 		}
 
-		if !strings.HasSuffix(path, ".go") {
+		if !lang.IsSupported(path) {
 			return nil
 		}
 
@@ -237,9 +238,12 @@ func (m *Mapper) discoverPackages(ctx context.Context) ([]PackageInfo, error) {
 		lines, _ := countLines(path)
 		pkg.Lines += lines
 
-		// Extract package name from first file
+		// Extract package/module name from first file
 		if pkg.Name == "" {
 			pkg.Name = extractPackageName(path)
+			if pkg.Name == "" {
+				pkg.Name = filepath.Base(dir)
+			}
 		}
 
 		return nil
@@ -308,6 +312,8 @@ func (m *Mapper) discoverDependencies(ctx context.Context) ([]Dependency, error)
 			return nil
 		}
 
+		// Dependency discovery currently supports Go import analysis.
+		// For other languages, directory-level grouping still works via packages.
 		if !strings.HasSuffix(path, ".go") {
 			return nil
 		}
@@ -422,16 +428,52 @@ func extractPackageName(path string) string {
 	}
 	defer f.Close()
 
-	buf := make([]byte, 512)
+	buf := make([]byte, 1024)
 	n, _ := f.Read(buf)
 	content := string(buf[:n])
 
 	for _, line := range strings.Split(content, "\n") {
 		line = strings.TrimSpace(line)
+		// Go: package <name>
 		if strings.HasPrefix(line, "package ") {
 			parts := strings.Fields(line)
 			if len(parts) >= 2 {
 				return parts[1]
+			}
+		}
+		// Java/Kotlin: package <name>;
+		if (strings.HasSuffix(path, ".java") || strings.HasSuffix(path, ".kt")) &&
+			strings.HasPrefix(line, "package ") {
+			pkg := strings.TrimPrefix(line, "package ")
+			pkg = strings.TrimSuffix(pkg, ";")
+			pkg = strings.TrimSpace(pkg)
+			if pkg != "" {
+				return pkg
+			}
+		}
+		// C#: namespace <name>
+		if strings.HasSuffix(path, ".cs") && strings.HasPrefix(line, "namespace ") {
+			ns := strings.TrimPrefix(line, "namespace ")
+			ns = strings.TrimSuffix(ns, "{")
+			ns = strings.TrimSuffix(ns, ";")
+			ns = strings.TrimSpace(ns)
+			if ns != "" {
+				return ns
+			}
+		}
+		// Rust: mod <name> or pub mod <name>
+		if strings.HasSuffix(path, ".rs") {
+			if strings.HasPrefix(line, "mod ") || strings.HasPrefix(line, "pub mod ") {
+				parts := strings.Fields(line)
+				for i, p := range parts {
+					if p == "mod" && i+1 < len(parts) {
+						name := strings.TrimSuffix(parts[i+1], "{")
+						name = strings.TrimSuffix(name, ";")
+						if name != "" {
+							return name
+						}
+					}
+				}
 			}
 		}
 	}

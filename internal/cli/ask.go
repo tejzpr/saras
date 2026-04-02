@@ -178,9 +178,14 @@ func runAskPlain(cmd *cobra.Command, pipeline *ask.Pipeline, opts ask.AskOptions
 		buf.WriteString(chunk.Content)
 	}
 
-	width := terminalWidth()
-	rendered := tui.RenderMarkdown(buf.String(), width)
-	fmt.Fprint(cmd.OutOrStdout(), rendered)
+	stylize, _ := cmd.Flags().GetBool("stylize-output")
+	if stylize {
+		width := terminalWidth()
+		rendered := tui.RenderMarkdown(buf.String(), width)
+		fmt.Fprint(cmd.OutOrStdout(), rendered)
+	} else {
+		fmt.Fprintln(cmd.OutOrStdout(), buf.String())
+	}
 	return nil
 }
 
@@ -202,7 +207,8 @@ func runAskTUI(cmd *cobra.Command, pipeline *ask.Pipeline, opts ask.AskOptions) 
 		return fmt.Errorf("ask: %w", err)
 	}
 
-	model := tui.NewAskModel(opts.Query)
+	stylize, _ := cmd.Flags().GetBool("stylize-output")
+	model := tui.NewAskModelWithStyle(opts.Query, stylize)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	// Feed stream chunks to TUI in background

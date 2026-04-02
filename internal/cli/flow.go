@@ -275,7 +275,8 @@ func runFlowExplain(cmd *cobra.Command, args []string) error {
 		return flowExplainPlain(ch, cmd)
 	}
 
-	return flowExplainTUI(ch, question)
+	stylize, _ := cmd.Flags().GetBool("stylize-output")
+	return flowExplainTUI(ch, question, stylize)
 }
 
 func flowExplainPlain(ch <-chan ask.StreamChunk, cmd *cobra.Command) error {
@@ -287,9 +288,14 @@ func flowExplainPlain(ch <-chan ask.StreamChunk, cmd *cobra.Command) error {
 		buf.WriteString(chunk.Content)
 	}
 
-	width := terminalWidth()
-	rendered := tui.RenderMarkdown(buf.String(), width)
-	fmt.Fprint(cmd.OutOrStdout(), rendered)
+	stylize, _ := cmd.Flags().GetBool("stylize-output")
+	if stylize {
+		width := terminalWidth()
+		rendered := tui.RenderMarkdown(buf.String(), width)
+		fmt.Fprint(cmd.OutOrStdout(), rendered)
+	} else {
+		fmt.Fprintln(cmd.OutOrStdout(), buf.String())
+	}
 	return nil
 }
 
@@ -308,8 +314,8 @@ func flowExplainToFile(ch <-chan ask.StreamChunk, path string, cmd *cobra.Comman
 	return nil
 }
 
-func flowExplainTUI(ch <-chan ask.StreamChunk, question string) error {
-	model := tui.NewAskModel("flow explain: " + question)
+func flowExplainTUI(ch <-chan ask.StreamChunk, question string, stylize bool) error {
+	model := tui.NewAskModelWithStyle("flow explain: "+question, stylize)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	go func() {

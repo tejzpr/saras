@@ -59,6 +59,7 @@ func GetRootCmd() *cobra.Command {
 }
 
 func init() {
+	rootCmd.PersistentFlags().Bool("stylize-output", false, "Render LLM markdown output with terminal styling (colors, syntax highlighting)")
 	rootCmd.AddCommand(versionCmd)
 }
 
