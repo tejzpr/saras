@@ -227,23 +227,24 @@ saras map --format markdown
 saras map --format tree
 ` + "```" + `
 
-## Execution Flow
+## Code Execution Flow
 
-Visualize call trees from entry points (main, CLI handlers, HTTP handlers):
+Useful to visualize call trees from entry points (main, CLI handlers, HTTP handlers):
 
 ` + "```bash" + `
 saras flow                    # all entry points
 saras flow full               # same as above
 saras flow HandleRequest      # from a specific function
 saras flow --depth 3          # limit depth (default: 8)
-saras flow explain            # LLM-powered explanation of the flow
-saras flow explain runSearch  # explain a specific function's flow
+saras flow explain --no-tui            # LLM-powered explanation of the flow
+saras flow explain runSearch --no-tui  # explain a specific function's flow
 ` + "```" + `
 
 - Works across all supported languages
 - Markers: (cycle), (↩) already expanded, (...) depth limit
 
 ## Important
+- Always pass --no-tui for ask and flow explain (TUI will block)
 - Do not run saras watch (blocking)
 - No results: run saras init or saras watch
 - Outputs include paths, lines, relevance
@@ -313,14 +314,15 @@ saras flow                    # all entry points
 saras flow full               # same as above
 saras flow HandleRequest      # from a specific function
 saras flow --depth 3          # limit depth (default: 8)
-saras flow explain            # LLM-powered explanation of the flow
-saras flow explain runSearch  # explain a specific function's flow
+saras flow explain --no-tui            # LLM-powered explanation of the flow
+saras flow explain runSearch --no-tui  # explain a specific function's flow
 ` + "```" + `
 
 - Works across all supported languages
 - Markers: (cycle), (↩) already expanded, (...) depth limit
 
 ## Important
+- Always pass --no-tui for ask and flow explain (TUI will block)
 - Do not run saras watch (blocking)
 - No results: run saras init or saras watch
 - Outputs include paths, lines, relevance
@@ -385,14 +387,15 @@ saras flow                    # all entry points
 saras flow full               # same as above
 saras flow HandleRequest      # from a specific function
 saras flow --depth 3          # limit depth (default: 8)
-saras flow explain            # LLM-powered explanation of the flow
-saras flow explain runSearch  # explain a specific function's flow
+saras flow explain --no-tui            # LLM-powered explanation of the flow
+saras flow explain runSearch --no-tui  # explain a specific function's flow
 ` + "```" + `
 
 - Works across all supported languages
 - Markers: (cycle), (↩) already expanded, (...) depth limit
 
 ## Important
+- Always pass --no-tui for ask and flow explain (TUI will block)
 - Do not run saras watch (blocking)
 - No results: run saras init or saras watch
 - Outputs include paths, lines, relevance
