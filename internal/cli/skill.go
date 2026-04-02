@@ -1,0 +1,310 @@
+/* SPDX-License-Identifier: MPL-2.0
+ * Copyright 2026 Tejus Pratap <tejzpr@gmail.com>
+ *
+ * See CONTRIBUTORS.md for full contributor list.
+ */
+
+package cli
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/spf13/cobra"
+)
+
+func init() {
+	rootCmd.AddCommand(installCmd)
+	installCmd.AddCommand(installSkillCmd)
+	installSkillCmd.Flags().Bool("cursor", false, "Install skill for Cursor (.cursor/rules/<project>.mdc)")
+	installSkillCmd.Flags().Bool("windsurf", false, "Install skill for Windsurf (.windsurf/skills/<project>/SKILL.md)")
+	installSkillCmd.Flags().Bool("claude", false, "Install skill for Claude Code (.claude/skills/<project>/SKILL.md)")
+	installSkillCmd.Flags().Bool("codex", false, "Install skill for OpenAI Codex (.agents/skills/<project>/SKILL.md)")
+	installSkillCmd.Flags().Bool("copilot", false, "Install skill for GitHub Copilot (.github/copilot-instructions.md)")
+}
+
+var installCmd = &cobra.Command{
+	Use:   "install",
+	Short: "Install saras integrations",
+}
+
+var installSkillCmd = &cobra.Command{
+	Use:   "skill",
+	Short: "Install a saras skill for an AI coding agent",
+	Long: `Install a skill file that teaches an AI coding agent how to use saras
+for codebase search, Q&A, symbol tracing, and architecture mapping.
+
+The skill name and folder are derived from the current directory name so that
+the skill matches the project (e.g. directory "myapp" → skill name "myapp").
+
+Pass one or more editor flags to specify which agents to install for:
+
+  --cursor     .cursor/rules/<project>.mdc
+  --windsurf   .windsurf/skills/<project>/SKILL.md
+  --claude     .claude/skills/<project>/SKILL.md
+  --codex      .agents/skills/<project>/SKILL.md
+  --copilot    .github/copilot-instructions.md
+
+Examples:
+  saras install skill --claude
+  saras install skill --cursor
+  saras install skill --windsurf --codex`,
+	RunE: runInstallSkill,
+}
+
+type editorSkill struct {
+	name    string
+	path    string
+	content string
+}
+
+func runInstallSkill(cmd *cobra.Command, args []string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+
+	projectName := filepath.Base(cwd)
+
+	editors := []editorSkill{
+		{"claude", filepath.Join(cwd, ".claude", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
+		{"codex", filepath.Join(cwd, ".agents", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
+		{"windsurf", filepath.Join(cwd, ".windsurf", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
+		{"cursor", filepath.Join(cwd, ".cursor", "rules", projectName+".mdc"), skillContentCursor()},
+		{"copilot", filepath.Join(cwd, ".github", "copilot-instructions.md"), ""},
+	}
+
+	installed := 0
+	for _, ed := range editors {
+		flag, _ := cmd.Flags().GetBool(ed.name)
+		if !flag {
+			continue
+		}
+
+		content := ed.content
+		if ed.name == "copilot" {
+			content = skillContentCopilot(ed.path)
+		}
+
+		if err := installSkillFile(cmd, ed.name, ed.path, content); err != nil {
+			return err
+		}
+		installed++
+	}
+
+	if installed == 0 {
+		return fmt.Errorf("specify at least one editor: --cursor, --windsurf, --claude, --codex, --copilot")
+	}
+	return nil
+}
+
+func installSkillFile(cmd *cobra.Command, agent, targetPath, content string) error {
+	// Create parent directories
+	dir := filepath.Dir(targetPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("create directory %s: %w", dir, err)
+	}
+
+	// For copilot, append if file already exists
+	if agent == "copilot" {
+		if existing, err := os.ReadFile(targetPath); err == nil {
+			if strings.Contains(string(existing), "# Saras Codebase Intelligence") {
+				fmt.Fprintf(cmd.OutOrStdout(), "Saras skill already exists in %s\n", targetPath)
+				return nil
+			}
+			content = string(existing) + "\n\n" + content
+		}
+	} else {
+		if _, err := os.Stat(targetPath); err == nil {
+			fmt.Fprintf(cmd.OutOrStdout(), "Overwriting existing skill at %s\n", targetPath)
+		}
+	}
+
+	if err := os.WriteFile(targetPath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("write skill file: %w", err)
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "Installed saras skill for %s at %s\n", agent, targetPath)
+	return nil
+}
+
+// skillContentAgentSkills returns the SKILL.md content following the Agent Skills spec
+// (used by Claude Code, OpenAI Codex, and Windsurf).
+func skillContentAgentSkills(projectName string) string {
+	return `---
+name: ` + projectName + `
+description: Uses saras CLI to search, ask questions about, trace symbols in, and map the
+  architecture of a codebase. Use when user asks to "search the code", "find where this is
+  defined", "explain how this works", "trace this function", "show me the architecture",
+  "what calls this", "understand this codebase", "how does this feature work", or
+  "generate an architecture map". Requires saras to be initialized in the project.
+---
+## Searching Code
+
+Use semantic search to find code.
+
+` + "```bash" + `
+saras search "authentication middleware" --limit 10 --json
+` + "```" + `
+
+- Always use --json for machine-readable output you can parse
+- Use --limit to control how many results (default 5)
+- Phrase queries as natural language for best results
+
+## Asking Questions
+
+For questions that need explanation.
+Ask short individual questions per ask to yield faster answers.
+
+` + "```bash" + `
+saras ask --no-tui "how does the payment flow work?"
+` + "```" + `
+
+## Tracing Symbols
+
+Find where a symbol is defined, who calls it, and what it calls:
+
+` + "```bash" + `
+saras trace HandleRequest
+saras trace HandleRequest --callers
+saras trace HandleRequest --callees
+` + "```" + `
+
+- Use exact symbol names (case-sensitive)
+
+## Architecture Maps
+
+Generate a structural overview of the project:
+
+` + "```bash" + `
+saras map --format summary
+saras map --format markdown
+saras map --format tree
+` + "```" + `
+
+## Important
+- Do not run saras watch (blocking)
+- No results: run saras init or saras watch
+- Outputs include paths, lines, relevance
+- Ask is stateless
+- Runs locally
+`
+}
+
+// skillContentCursor returns the .mdc content for Cursor rules.
+func skillContentCursor() string {
+	return `---
+description: Uses saras CLI for codebase search, Q&A, symbol tracing, and architecture
+  mapping. Use when user asks to search code, explain how something works, trace a function,
+  show architecture, or understand the codebase. Requires saras to be initialized.
+alwaysApply: false
+---
+## Searching Code
+
+Use semantic search to find code.
+
+` + "```bash" + `
+saras search "authentication middleware" --limit 10 --json
+` + "```" + `
+
+- Always use --json for machine-readable output you can parse
+- Use --limit to control how many results (default 5)
+- Phrase queries as natural language for best results
+
+## Asking Questions
+
+For questions that need explanation.
+Ask short individual questions per ask to yield faster answers.
+
+` + "```bash" + `
+saras ask --no-tui "how does the payment flow work?"
+` + "```" + `
+
+## Tracing Symbols
+
+Find where a symbol is defined, who calls it, and what it calls:
+
+` + "```bash" + `
+saras trace HandleRequest
+saras trace HandleRequest --callers
+saras trace HandleRequest --callees
+` + "```" + `
+
+- Use exact symbol names (case-sensitive)
+
+## Architecture Maps
+
+Generate a structural overview of the project:
+
+` + "```bash" + `
+saras map --format summary
+saras map --format markdown
+saras map --format tree
+` + "```" + `
+
+## Important
+- Do not run saras watch (blocking)
+- No results: run saras init or saras watch
+- Outputs include paths, lines, relevance
+- Ask is stateless
+- Runs locally
+`
+}
+
+// skillContentCopilot returns plain markdown for GitHub Copilot instructions.
+func skillContentCopilot(path string) string {
+	return `# Saras Codebase Intelligence
+
+## Searching Code
+
+Use semantic search to find code.
+
+` + "```bash" + `
+saras search "authentication middleware" --limit 10 --json
+` + "```" + `
+
+- Always use --json for machine-readable output you can parse
+- Use --limit to control how many results (default 5)
+- Phrase queries as natural language for best results
+
+## Asking Questions
+
+For questions that need explanation.
+Ask short individual questions per ask to yield faster answers.
+
+` + "```bash" + `
+saras ask --no-tui "how does the payment flow work?"
+` + "```" + `
+
+## Tracing Symbols
+
+Find where a symbol is defined, who calls it, and what it calls:
+
+` + "```bash" + `
+saras trace HandleRequest
+saras trace HandleRequest --callers
+saras trace HandleRequest --callees
+` + "```" + `
+
+- Use exact symbol names (case-sensitive)
+
+## Architecture Maps
+
+Generate a structural overview of the project:
+
+` + "```bash" + `
+saras map --format summary
+saras map --format markdown
+saras map --format tree
+` + "```" + `
+
+## Important
+- Do not run saras watch (blocking)
+- No results: run saras init or saras watch
+- Outputs include paths, lines, relevance
+- Ask is stateless
+- Runs locally
+`
+}
