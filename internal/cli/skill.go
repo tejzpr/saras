@@ -203,8 +203,8 @@ Ask short individual questions per ask to yield faster answers.
 
 ` + "```bash" + `
 saras ask --no-tui "how does the payment flow work?"
-saras ask --no-tui --with-flow "how does auth work?"            # include call-flow tree
-saras ask --no-tui --with-flow=handleAuth "explain error paths" # flow from specific function
+saras ask --no-tui --with-arch "how does auth work?"            # include architecture call-flow tree
+saras ask --no-tui --with-arch=handleAuth "explain error paths" # architecture flow from specific function
 ` + "```" + `
 
 ## Tracing Symbols
@@ -229,27 +229,28 @@ saras map --format markdown
 saras map --format tree
 ` + "```" + `
 
-## Code Execution Flow
+## Architecture Call-Flow
 
-Useful to visualize call trees from entry points (main, CLI handlers, HTTP handlers):
+Visualize call trees from entry points (main, CLI handlers, HTTP handlers):
 
 ` + "```bash" + `
-saras flow                    # all entry points
-saras flow full               # same as above
-saras flow HandleRequest      # from a specific function
-saras flow --depth 3          # limit depth (default: 8)
-saras flow -o FLOW.md         # write to file
-saras flow explain --no-tui            # concise LLM summary of the flow
-saras flow explain full --no-tui       # exhaustive deep-dive analysis
-saras flow explain full --no-tui -o EXPLAIN.md  # deep-dive to file
-saras flow explain runSearch --no-tui  # explain a specific function's flow
+saras architecture                    # all entry points
+saras architecture full               # same as above
+saras architecture HandleRequest      # from a specific function
+saras architecture --depth 3          # limit depth (default: 8)
+saras architecture -o FLOW.md         # write to file
+saras architecture explain --no-tui            # concise LLM summary
+saras architecture explain full --no-tui       # exhaustive deep-dive analysis
+saras architecture explain full --no-tui -o EXPLAIN.md  # deep-dive to file
+saras architecture explain runSearch --no-tui  # explain a specific function's flow
 ` + "```" + `
 
 - Works across all supported languages
+- Aliases: saras flow, saras arch
 - Markers: (cycle), (↩) already expanded, (...) depth limit
 
 ## Important
-- Always pass --no-tui for ask and flow explain (TUI will block)
+- Always pass --no-tui for ask and architecture explain (TUI will block)
 - Do not run saras watch (blocking)
 - No results: run saras init or saras reindex
 - Outputs include paths, lines, relevance
@@ -286,8 +287,8 @@ Ask short individual questions per ask to yield faster answers.
 
 ` + "```bash" + `
 saras ask --no-tui "how does the payment flow work?"
-saras ask --no-tui --with-flow "how does auth work?"            # include call-flow tree
-saras ask --no-tui --with-flow=handleAuth "explain error paths" # flow from specific function
+saras ask --no-tui --with-arch "how does auth work?"            # include architecture call-flow tree
+saras ask --no-tui --with-arch=handleAuth "explain error paths" # architecture flow from specific function
 ` + "```" + `
 
 ## Tracing Symbols
@@ -312,27 +313,28 @@ saras map --format markdown
 saras map --format tree
 ` + "```" + `
 
-## Execution Flow
+## Architecture Call-Flow
 
 Visualize call trees from entry points (main, CLI handlers, HTTP handlers):
 
 ` + "```bash" + `
-saras flow                    # all entry points
-saras flow full               # same as above
-saras flow HandleRequest      # from a specific function
-saras flow --depth 3          # limit depth (default: 8)
-saras flow -o FLOW.md         # write to file
-saras flow explain --no-tui            # concise LLM summary of the flow
-saras flow explain full --no-tui       # exhaustive deep-dive analysis
-saras flow explain full --no-tui -o EXPLAIN.md  # deep-dive to file
-saras flow explain runSearch --no-tui  # explain a specific function's flow
+saras architecture                    # all entry points
+saras architecture full               # same as above
+saras architecture HandleRequest      # from a specific function
+saras architecture --depth 3          # limit depth (default: 8)
+saras architecture -o FLOW.md         # write to file
+saras architecture explain --no-tui            # concise LLM summary
+saras architecture explain full --no-tui       # exhaustive deep-dive analysis
+saras architecture explain full --no-tui -o EXPLAIN.md  # deep-dive to file
+saras architecture explain runSearch --no-tui  # explain a specific function's flow
 ` + "```" + `
 
 - Works across all supported languages
+- Aliases: saras flow, saras arch
 - Markers: (cycle), (↩) already expanded, (...) depth limit
 
 ## Important
-- Always pass --no-tui for ask and flow explain (TUI will block)
+- Always pass --no-tui for ask and architecture explain (TUI will block)
 - Do not run saras watch (blocking)
 - No results: run saras init or saras reindex
 - Outputs include paths, lines, relevance
@@ -364,8 +366,8 @@ Ask short individual questions per ask to yield faster answers.
 
 ` + "```bash" + `
 saras ask --no-tui "how does the payment flow work?"
-saras ask --no-tui --with-flow "how does auth work?"            # include call-flow tree
-saras ask --no-tui --with-flow=handleAuth "explain error paths" # flow from specific function
+saras ask --no-tui --with-arch "how does auth work?"            # include architecture call-flow tree
+saras ask --no-tui --with-arch=handleAuth "explain error paths" # architecture flow from specific function
 ` + "```" + `
 
 ## Tracing Symbols
@@ -390,27 +392,28 @@ saras map --format markdown
 saras map --format tree
 ` + "```" + `
 
-## Execution Flow
+## Architecture Call-Flow
 
 Visualize call trees from entry points (main, CLI handlers, HTTP handlers):
 
 ` + "```bash" + `
-saras flow                    # all entry points
-saras flow full               # same as above
-saras flow HandleRequest      # from a specific function
-saras flow --depth 3          # limit depth (default: 8)
-saras flow -o FLOW.md         # write to file
-saras flow explain --no-tui            # concise LLM summary of the flow
-saras flow explain full --no-tui       # exhaustive deep-dive analysis
-saras flow explain full --no-tui -o EXPLAIN.md  # deep-dive to file
-saras flow explain runSearch --no-tui  # explain a specific function's flow
+saras architecture                    # all entry points
+saras architecture full               # same as above
+saras architecture HandleRequest      # from a specific function
+saras architecture --depth 3          # limit depth (default: 8)
+saras architecture -o FLOW.md         # write to file
+saras architecture explain --no-tui            # concise LLM summary
+saras architecture explain full --no-tui       # exhaustive deep-dive analysis
+saras architecture explain full --no-tui -o EXPLAIN.md  # deep-dive to file
+saras architecture explain runSearch --no-tui  # explain a specific function's flow
 ` + "```" + `
 
 - Works across all supported languages
+- Aliases: saras flow, saras arch
 - Markers: (cycle), (↩) already expanded, (...) depth limit
 
 ## Important
-- Always pass --no-tui for ask and flow explain (TUI will block)
+- Always pass --no-tui for ask and architecture explain (TUI will block)
 - Do not run saras watch (blocking)
 - No results: run saras init or saras reindex
 - Outputs include paths, lines, relevance

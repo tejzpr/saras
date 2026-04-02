@@ -82,12 +82,12 @@ saras search "error handling" --json
 ```bash
 saras ask "how does the login flow work?"
 saras ask "what database connections are used?" --no-tui
-saras ask --with-flow "how does auth work?"            # include call-flow tree in context
-saras ask --with-flow=handleAuth "explain error paths"  # flow from specific function
+saras ask --with-arch "how does auth work?"            # include architecture call-flow in context
+saras ask --with-arch=handleAuth "explain error paths"  # architecture flow from specific function
 ```
 
 With `--no-tui`, responses stream to stdout in real-time as the LLM generates them.
-With `--with-flow`, a compact call-flow tree (depth 3) is prepended to the RAG context, giving the LLM both structural and code-level insight. For deeper flow analysis, use `saras flow explain full`.
+With `--with-arch`, a compact call-flow tree (depth 3) is prepended to the RAG context, giving the LLM both structural and code-level insight. For deeper analysis, use `saras architecture explain full`.
 
 ### Trace
 
@@ -106,21 +106,22 @@ saras map --format summary         # compact overview
 saras map -f markdown -o ARCH.md   # write to file
 ```
 
-### Flow
+### Architecture
 
-Show execution flow from entry points through your codebase as a call tree.
+Show architecture call-flow from entry points through your codebase as a call tree.
+Aliases: `saras flow`, `saras arch`
 
 ```bash
-saras flow                    # all entry points (main, commands, handlers)
-saras flow full               # same as above (explicit)
-saras flow runSearch          # call tree from a specific function
-saras flow --depth 3          # limit tree depth (default: 8)
-saras flow -o FLOW.md         # write to file
-saras flow explain            # concise LLM summary of all entry points
-saras flow explain full       # exhaustive deep-dive (depth 12, detailed analysis)
-saras flow explain runSearch  # explain a specific function's flow
-saras flow explain --no-tui   # plain stdout output
-saras flow explain full --no-tui  # deep-dive, plain stdout
+saras architecture                    # all entry points (main, commands, handlers)
+saras architecture full               # same as above (explicit)
+saras architecture runSearch          # call tree from a specific function
+saras architecture --depth 3          # limit tree depth (default: 8)
+saras architecture -o FLOW.md         # write to file
+saras architecture explain            # concise LLM summary of all entry points
+saras architecture explain full       # exhaustive deep-dive (depth 12, detailed analysis)
+saras architecture explain runSearch  # explain a specific function's flow
+saras architecture explain --no-tui   # plain stdout output
+saras architecture explain full --no-tui  # deep-dive, plain stdout
 ```
 
 Entry points are auto-detected across all supported languages: `main()` / `init()` in Go, `main` in C/C++/Rust/Zig/Kotlin, `Main` in C#, `main()` guarded by `if __name__` in Python, `public static void main` in Java, plus Cobra command handlers (`RunE`/`Run`) and HTTP handlers. Each language plugin provides its own keyword list, comment syntax, and entry-point heuristics for accurate call-graph analysis. Ambiguous method resolutions (e.g. interface methods implemented on multiple types) are omitted for accuracy. Markers indicate cycles `(cycle)`, already-expanded nodes `(↩)`, and depth limits `(...)`.

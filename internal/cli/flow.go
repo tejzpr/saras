@@ -25,13 +25,14 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(flowCmd)
-	flowCmd.AddCommand(flowExplainCmd)
+	rootCmd.AddCommand(archCmd)
+	archCmd.AddCommand(archExplainCmd)
 }
 
-var flowCmd = &cobra.Command{
-	Use:   "flow [function]",
-	Short: "Show execution flow from entry points or a specific function",
+var archCmd = &cobra.Command{
+	Use:     "architecture [function]",
+	Aliases: []string{"flow", "arch"},
+	Short:   "Show architecture call-flow from entry points or a specific function",
 	Long: `Generate a call-flow tree showing how execution flows through your codebase.
 
 Without arguments (or with "full"), shows flows from all detected entry points
@@ -40,29 +41,30 @@ Without arguments (or with "full"), shows flows from all detected entry points
 With a function name, shows the call tree from that specific function.
 
 Examples:
-  saras flow              # all entry points
-  saras flow full         # all entry points (explicit)
-  saras flow runInit      # flow from a specific function
-  saras flow --depth 3    # limit tree depth
-  saras flow -o FLOW.md   # write to file`,
+  saras architecture              # all entry points
+  saras architecture full         # all entry points (explicit)
+  saras architecture runInit      # flow from a specific function
+  saras architecture --depth 3    # limit tree depth
+  saras architecture -o FLOW.md   # write to file
+  saras flow                      # alias for architecture`,
 	RunE: runFlow,
 }
 
 func init() {
-	flowCmd.Flags().IntP("depth", "d", 8, "Maximum call tree depth")
-	flowCmd.Flags().StringP("output", "o", "", "Write output to file instead of stdout")
+	archCmd.Flags().IntP("depth", "d", 8, "Maximum call tree depth")
+	archCmd.Flags().StringP("output", "o", "", "Write output to file instead of stdout")
 
-	flowExplainCmd.Flags().IntP("depth", "d", 8, "Maximum call tree depth")
-	flowExplainCmd.Flags().StringP("output", "o", "", "Write output to file instead of stdout")
-	flowExplainCmd.Flags().Bool("no-tui", false, "Print response to stdout (no interactive TUI)")
-	flowExplainCmd.Flags().Int("max-tokens", 4096, "Maximum response tokens")
-	flowExplainCmd.Flags().Float32("temperature", 0.2, "LLM temperature")
-	flowExplainCmd.Flags().String("model", "", "Override LLM model")
+	archExplainCmd.Flags().IntP("depth", "d", 8, "Maximum call tree depth")
+	archExplainCmd.Flags().StringP("output", "o", "", "Write output to file instead of stdout")
+	archExplainCmd.Flags().Bool("no-tui", false, "Print response to stdout (no interactive TUI)")
+	archExplainCmd.Flags().Int("max-tokens", 4096, "Maximum response tokens")
+	archExplainCmd.Flags().Float32("temperature", 0.2, "LLM temperature")
+	archExplainCmd.Flags().String("model", "", "Override LLM model")
 }
 
-var flowExplainCmd = &cobra.Command{
+var archExplainCmd = &cobra.Command{
 	Use:   "explain [function]",
-	Short: "Explain execution flow using an LLM",
+	Short: "Explain architecture call-flow using an LLM",
 	Long: `Generate a call-flow tree and send it to your configured LLM for a
 natural-language explanation of how execution flows through the codebase.
 
@@ -72,11 +74,11 @@ per-entry-point analysis, shared infrastructure, patterns, and data flow.
 With a function name, explains the call tree from that specific function.
 
 Examples:
-  saras flow explain                # concise summary of all entry points
-  saras flow explain full           # exhaustive deep-dive analysis
-  saras flow explain handleRequest  # explain a specific function's flow
-  saras flow explain --no-tui       # plain stdout output
-  saras flow explain -o EXPLAIN.md  # write to file`,
+  saras architecture explain                # concise summary of all entry points
+  saras architecture explain full           # exhaustive deep-dive analysis
+  saras architecture explain handleRequest  # explain a specific function's flow
+  saras architecture explain --no-tui       # plain stdout output
+  saras architecture explain -o EXPLAIN.md  # write to file`,
 	RunE: runFlowExplain,
 }
 
@@ -315,7 +317,7 @@ func flowExplainToFile(ch <-chan ask.StreamChunk, path string, cmd *cobra.Comman
 }
 
 func flowExplainTUI(ch <-chan ask.StreamChunk, question string, stylize bool) error {
-	model := tui.NewAskModelWithStyle("flow explain: "+question, stylize)
+	model := tui.NewAskModelWithStyle("architecture explain: "+question, stylize)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	go func() {

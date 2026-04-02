@@ -52,8 +52,8 @@ func init() {
 	askCmd.Flags().String("model", "", "Override LLM model")
 	askCmd.Flags().Bool("no-tui", false, "Print response to stdout (no interactive TUI)")
 	askCmd.Flags().StringP("output", "o", "", "Write response to file instead of stdout")
-	askCmd.Flags().String("with-flow", "", "Include call-flow tree in context (optional: function name)")
-	askCmd.Flags().Lookup("with-flow").NoOptDefVal = "__all__"
+	askCmd.Flags().String("with-arch", "", "Include architecture call-flow tree in context (optional: function name). For deeper analysis use 'saras architecture explain full'")
+	askCmd.Flags().Lookup("with-arch").NoOptDefVal = "__all__"
 }
 
 func runAsk(cmd *cobra.Command, args []string) error {
@@ -64,7 +64,7 @@ func runAsk(cmd *cobra.Command, args []string) error {
 	model, _ := cmd.Flags().GetString("model")
 	noTUI, _ := cmd.Flags().GetBool("no-tui")
 	outputFile, _ := cmd.Flags().GetString("output")
-	withFlow, _ := cmd.Flags().GetString("with-flow")
+	withFlow, _ := cmd.Flags().GetString("with-arch")
 
 	projectRoot, err := config.FindProjectRoot()
 	if err != nil {
@@ -230,7 +230,7 @@ func runAskTUI(cmd *cobra.Command, pipeline *ask.Pipeline, opts ask.AskOptions) 
 	return nil
 }
 
-const flowHintFooter = "\n\n---\n💡 For deeper analysis, try: `saras flow` (call tree) or `saras flow explain full` (exhaustive LLM walkthrough)."
+const flowHintFooter = "\n\n---\nFor deeper architecture analysis, use: `saras architecture` (call tree) or `saras architecture explain full` (exhaustive LLM walkthrough)."
 
 // buildFlowContext generates a compact call-flow tree (depth 3) for use as
 // additional context in ask queries. If funcName is "__all__" it generates

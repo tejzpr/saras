@@ -30,6 +30,7 @@ Commands:
   search   Semantic code search
   ask      Ask a question about your codebase (LLM-powered)
   trace    Explore callers, callees, and the call graph
+  architecture  Show architecture call-flow (aliases: flow, arch)
   map      Generate an architecture overview
   serve    Start the MCP server for AI agent integration
   update   Update saras to the latest version`,
