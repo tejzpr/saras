@@ -36,7 +36,7 @@ Saras requires an **embedding model** (to index your code) and an **LLM** (for A
 
 | Provider | Setup |
 |----------|-------|
-| [Ollama](https://ollama.com/) (recommended) | `ollama pull nomic-embed-text && ollama pull qwen3.5:2b` |
+| [Ollama](https://ollama.com/) (recommended) | `ollama pull qwen3-embedding:0.6b && ollama pull qwen3.5:2b` |
 | [LM Studio](https://lmstudio.ai/) | Download an embedding model and a chat model |
 | OpenAI-compatible | Any endpoint that speaks the OpenAI API (requires API key) |
 
