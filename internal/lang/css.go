@@ -18,6 +18,13 @@ type CSSParser struct{}
 
 func (p *CSSParser) Name() string         { return "css" }
 func (p *CSSParser) Extensions() []string { return []string{".css", ".scss", ".less", ".sass"} }
+
+func (p *CSSParser) FlowHints() FlowHints {
+	return FlowHints{
+		CommentPrefixes: []string{"//"},
+	}
+}
+
 func (p *CSSParser) IsTestFile(path string) bool {
 	return false // CSS doesn't have test files
 }

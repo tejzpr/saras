@@ -177,11 +177,12 @@ func installSkillFile(cmd *cobra.Command, agent, targetPath, content string) err
 func skillContentAgentSkills(projectName string) string {
 	return `---
 name: ` + projectName + `
-description: Uses saras CLI to search, ask questions about, trace symbols in, and map the
-  architecture of a codebase. Use when user asks to "search the code", "find where this is
-  defined", "explain how this works", "trace this function", "show me the architecture",
-  "what calls this", "understand this codebase", "how does this feature work", or
-  "generate an architecture map". Requires saras to be initialized in the project.
+description: Uses saras CLI to search, ask questions about, trace symbols in, map the
+  architecture of, and visualize execution flow in a codebase. Use when user asks to
+  "search the code", "find where this is defined", "explain how this works", "trace this
+  function", "show me the architecture", "what calls this", "understand this codebase",
+  "how does this feature work", "generate an architecture map", "show the execution flow",
+  or "what does main call". Requires saras to be initialized in the project.
 ---
 ## Searching Code
 
@@ -226,6 +227,22 @@ saras map --format markdown
 saras map --format tree
 ` + "```" + `
 
+## Execution Flow
+
+Visualize call trees from entry points (main, CLI handlers, HTTP handlers):
+
+` + "```bash" + `
+saras flow                    # all entry points
+saras flow full               # same as above
+saras flow HandleRequest      # from a specific function
+saras flow --depth 3          # limit depth (default: 8)
+saras flow explain            # LLM-powered explanation of the flow
+saras flow explain runSearch  # explain a specific function's flow
+` + "```" + `
+
+- Works across all supported languages
+- Markers: (cycle), (↩) already expanded, (...) depth limit
+
 ## Important
 - Do not run saras watch (blocking)
 - No results: run saras init or saras watch
@@ -238,9 +255,10 @@ saras map --format tree
 // skillContentCursor returns the .mdc content for Cursor rules.
 func skillContentCursor() string {
 	return `---
-description: Uses saras CLI for codebase search, Q&A, symbol tracing, and architecture
-  mapping. Use when user asks to search code, explain how something works, trace a function,
-  show architecture, or understand the codebase. Requires saras to be initialized.
+description: Uses saras CLI for codebase search, Q&A, symbol tracing, architecture
+  mapping, and execution flow visualization. Use when user asks to search code, explain
+  how something works, trace a function, show architecture, visualize execution flow,
+  or understand the codebase. Requires saras to be initialized.
 alwaysApply: false
 ---
 ## Searching Code
@@ -285,6 +303,22 @@ saras map --format summary
 saras map --format markdown
 saras map --format tree
 ` + "```" + `
+
+## Execution Flow
+
+Visualize call trees from entry points (main, CLI handlers, HTTP handlers):
+
+` + "```bash" + `
+saras flow                    # all entry points
+saras flow full               # same as above
+saras flow HandleRequest      # from a specific function
+saras flow --depth 3          # limit depth (default: 8)
+saras flow explain            # LLM-powered explanation of the flow
+saras flow explain runSearch  # explain a specific function's flow
+` + "```" + `
+
+- Works across all supported languages
+- Markers: (cycle), (↩) already expanded, (...) depth limit
 
 ## Important
 - Do not run saras watch (blocking)
@@ -341,6 +375,22 @@ saras map --format summary
 saras map --format markdown
 saras map --format tree
 ` + "```" + `
+
+## Execution Flow
+
+Visualize call trees from entry points (main, CLI handlers, HTTP handlers):
+
+` + "```bash" + `
+saras flow                    # all entry points
+saras flow full               # same as above
+saras flow HandleRequest      # from a specific function
+saras flow --depth 3          # limit depth (default: 8)
+saras flow explain            # LLM-powered explanation of the flow
+saras flow explain runSearch  # explain a specific function's flow
+` + "```" + `
+
+- Works across all supported languages
+- Markers: (cycle), (↩) already expanded, (...) depth limit
 
 ## Important
 - Do not run saras watch (blocking)

@@ -20,6 +20,13 @@ func (p *XMLParser) Name() string { return "xml" }
 func (p *XMLParser) Extensions() []string {
 	return []string{".xml", ".xsl", ".xslt", ".xsd", ".svg", ".plist", ".xaml"}
 }
+
+func (p *XMLParser) FlowHints() FlowHints {
+	return FlowHints{
+		CommentPrefixes: []string{"<!--"},
+	}
+}
+
 func (p *XMLParser) IsTestFile(path string) bool {
 	return false
 }

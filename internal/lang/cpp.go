@@ -16,8 +16,31 @@ func init() { Register(&CppParser{}) }
 // CppParser extracts symbols from C++ source files.
 type CppParser struct{}
 
-func (p *CppParser) Name() string         { return "cpp" }
-func (p *CppParser) Extensions() []string { return []string{".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".hh"} }
+func (p *CppParser) Name() string { return "cpp" }
+func (p *CppParser) Extensions() []string {
+	return []string{".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".hh"}
+}
+
+func (p *CppParser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"main"},
+		Keywords: []string{
+			"if", "for", "while", "else", "switch", "case", "return",
+			"break", "continue", "do", "goto", "sizeof", "typeof", "typeid",
+			"new", "delete", "throw", "try", "catch",
+			"this", "class", "struct", "enum", "union", "namespace", "using",
+			"template", "typename", "static_cast", "dynamic_cast",
+			"reinterpret_cast", "const_cast", "decltype", "auto",
+			"std", "cout", "cerr", "endl", "string", "vector", "map", "set",
+			"make_shared", "make_unique", "move", "forward",
+			"printf", "fprintf", "sprintf", "scanf",
+			"malloc", "calloc", "realloc", "free",
+			"memcpy", "memset", "strlen", "strcmp",
+		},
+		CommentPrefixes: []string{"//"},
+	}
+}
+
 func (p *CppParser) IsTestFile(path string) bool {
 	lower := strings.ToLower(path)
 	return strings.Contains(lower, "test") && (strings.HasSuffix(lower, ".cpp") || strings.HasSuffix(lower, ".cc"))

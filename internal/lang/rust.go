@@ -18,6 +18,25 @@ type RustParser struct{}
 
 func (p *RustParser) Name() string         { return "rust" }
 func (p *RustParser) Extensions() []string { return []string{".rs"} }
+
+func (p *RustParser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"main"},
+		Keywords: []string{
+			"if", "for", "while", "else", "loop", "match", "return",
+			"break", "continue", "let", "mut", "fn", "struct", "enum",
+			"impl", "trait", "use", "mod", "pub", "self", "super", "crate",
+			"async", "await", "move", "unsafe", "dyn", "where", "as", "in",
+			"ref", "type", "const", "static", "extern",
+			"println", "eprintln", "format", "write", "writeln",
+			"vec", "Box", "Rc", "Arc", "Some", "None", "Ok", "Err",
+			"String", "Vec", "HashMap", "HashSet", "Option", "Result",
+			"assert", "assert_eq", "assert_ne", "panic", "todo", "unimplemented",
+		},
+		CommentPrefixes: []string{"//"},
+	}
+}
+
 func (p *RustParser) IsTestFile(path string) bool {
 	return strings.Contains(path, "/tests/") || strings.Contains(path, "tests/") || strings.HasSuffix(path, "_test.rs")
 }

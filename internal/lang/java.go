@@ -18,6 +18,30 @@ type JavaParser struct{}
 
 func (p *JavaParser) Name() string         { return "java" }
 func (p *JavaParser) Extensions() []string { return []string{".java"} }
+
+func (p *JavaParser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"main"},
+		IsEntryFile: func(content string) bool {
+			return strings.Contains(content, "static void main") ||
+				strings.Contains(content, "static void Main")
+		},
+		Keywords: []string{
+			"if", "for", "while", "else", "switch", "case", "return",
+			"break", "continue", "throw", "try", "catch", "finally",
+			"new", "instanceof", "this", "super",
+			"class", "interface", "enum", "extends", "implements",
+			"import", "package", "abstract", "final", "static",
+			"synchronized", "volatile", "transient", "native",
+			"assert", "default", "void",
+			"System", "String", "Integer", "Long", "Double", "Float",
+			"Boolean", "Object", "Arrays", "Collections", "Optional",
+			"Math", "List", "Map", "Set",
+		},
+		CommentPrefixes: []string{"//"},
+	}
+}
+
 func (p *JavaParser) IsTestFile(path string) bool {
 	lower := strings.ToLower(path)
 	return strings.HasSuffix(lower, "test.java") || strings.Contains(lower, "/test/")

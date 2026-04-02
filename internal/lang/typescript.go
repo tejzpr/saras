@@ -18,6 +18,27 @@ type TypeScriptParser struct{}
 
 func (p *TypeScriptParser) Name() string         { return "typescript" }
 func (p *TypeScriptParser) Extensions() []string { return []string{".ts", ".tsx"} }
+
+func (p *TypeScriptParser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"main"},
+		Keywords: []string{
+			"if", "for", "while", "else", "switch", "case", "return",
+			"break", "continue", "throw", "try", "catch", "finally",
+			"typeof", "instanceof", "new", "delete", "void",
+			"require", "import", "from", "var", "let", "const",
+			"function", "class", "async", "await", "yield",
+			"super", "this", "of", "in", "as", "is", "keyof",
+			"console", "setTimeout", "setInterval", "clearTimeout",
+			"clearInterval", "Promise", "Array", "Object", "String",
+			"Number", "Boolean", "Math", "JSON", "Date", "RegExp",
+			"parseInt", "parseFloat", "isNaN", "isFinite",
+			"Record", "Partial", "Required", "Readonly", "Pick", "Omit",
+		},
+		CommentPrefixes: []string{"//"},
+	}
+}
+
 func (p *TypeScriptParser) IsTestFile(path string) bool {
 	lower := strings.ToLower(path)
 	return strings.Contains(lower, ".test.") || strings.Contains(lower, ".spec.") ||

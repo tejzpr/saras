@@ -18,6 +18,25 @@ type RubyParser struct{}
 
 func (p *RubyParser) Name() string         { return "ruby" }
 func (p *RubyParser) Extensions() []string { return []string{".rb", ".rake", ".gemspec"} }
+
+func (p *RubyParser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"main"},
+		Keywords: []string{
+			"if", "unless", "while", "until", "for", "case", "when",
+			"return", "break", "next", "redo", "retry",
+			"begin", "rescue", "ensure", "raise",
+			"class", "module", "def", "do", "end",
+			"self", "super", "require", "include", "extend",
+			"attr_reader", "attr_writer", "attr_accessor",
+			"puts", "print", "p", "pp", "warn",
+			"lambda", "proc", "block_given", "yield",
+			"nil", "true", "false",
+		},
+		CommentPrefixes: []string{"#"},
+	}
+}
+
 func (p *RubyParser) IsTestFile(path string) bool {
 	lower := strings.ToLower(path)
 	return strings.HasSuffix(lower, "_test.rb") ||

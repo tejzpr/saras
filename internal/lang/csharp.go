@@ -18,6 +18,30 @@ type CSharpParser struct{}
 
 func (p *CSharpParser) Name() string         { return "csharp" }
 func (p *CSharpParser) Extensions() []string { return []string{".cs", ".csx"} }
+
+func (p *CSharpParser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"Main"},
+		IsEntryFile: func(content string) bool {
+			return strings.Contains(content, "static void Main") ||
+				strings.Contains(content, "static async Task Main") ||
+				strings.Contains(content, "static int Main")
+		},
+		Keywords: []string{
+			"if", "for", "while", "else", "foreach", "switch", "case", "return",
+			"break", "continue", "throw", "try", "catch", "finally",
+			"new", "typeof", "sizeof", "nameof", "is", "as",
+			"this", "base", "class", "struct", "enum", "interface",
+			"namespace", "using", "async", "await",
+			"abstract", "virtual", "override", "sealed", "static",
+			"var", "dynamic", "object", "string", "int", "bool",
+			"Console", "String", "Math", "Convert", "Task",
+			"List", "Dictionary", "HashSet", "Array",
+		},
+		CommentPrefixes: []string{"//"},
+	}
+}
+
 func (p *CSharpParser) IsTestFile(path string) bool {
 	lower := strings.ToLower(path)
 	return strings.HasSuffix(lower, "test.cs") ||
@@ -27,18 +51,18 @@ func (p *CSharpParser) IsTestFile(path string) bool {
 }
 
 var (
-	csNamespacePattern  = regexp.MustCompile(`^(?:file\s+)?namespace\s+([\w.]+)`)
-	csClassPattern      = regexp.MustCompile(`^(?:(?:public|private|protected|internal|static|abstract|sealed|partial)\s+)*class\s+(\w+)`)
-	csStructPattern     = regexp.MustCompile(`^(?:(?:public|private|protected|internal|readonly|ref|partial)\s+)*struct\s+(\w+)`)
-	csInterfacePattern  = regexp.MustCompile(`^(?:(?:public|private|protected|internal|partial)\s+)*interface\s+(\w+)`)
-	csEnumPattern       = regexp.MustCompile(`^(?:(?:public|private|protected|internal)\s+)*enum\s+(\w+)`)
-	csRecordPattern     = regexp.MustCompile(`^(?:(?:public|private|protected|internal|sealed|abstract|partial)\s+)*record\s+(?:struct\s+|class\s+)?(\w+)`)
-	csMethodPattern     = regexp.MustCompile(`^(?:(?:public|private|protected|internal|static|virtual|override|abstract|async|sealed|new|extern)\s+)*(?:[\w<>\[\]?,\s]+)\s+(\w+)\s*\(`)
-	csPropertyPattern   = regexp.MustCompile(`^(?:(?:public|private|protected|internal|static|virtual|override|abstract|new)\s+)*(?:[\w<>\[\]?,]+)\s+(\w+)\s*\{\s*(?:get|set)`)
-	csConstPattern      = regexp.MustCompile(`^(?:(?:public|private|protected|internal)\s+)*const\s+\S+\s+(\w+)\s*=`)
-	csDelegatePattern   = regexp.MustCompile(`^(?:(?:public|private|protected|internal)\s+)*delegate\s+\S+\s+(\w+)\s*[(<]`)
-	csEventPattern      = regexp.MustCompile(`^(?:(?:public|private|protected|internal|static)\s+)*event\s+\S+\s+(\w+)\s*[;{]`)
-	csUsingPattern      = regexp.MustCompile(`^using\s+(?:static\s+)?([\w.]+)\s*;`)
+	csNamespacePattern = regexp.MustCompile(`^(?:file\s+)?namespace\s+([\w.]+)`)
+	csClassPattern     = regexp.MustCompile(`^(?:(?:public|private|protected|internal|static|abstract|sealed|partial)\s+)*class\s+(\w+)`)
+	csStructPattern    = regexp.MustCompile(`^(?:(?:public|private|protected|internal|readonly|ref|partial)\s+)*struct\s+(\w+)`)
+	csInterfacePattern = regexp.MustCompile(`^(?:(?:public|private|protected|internal|partial)\s+)*interface\s+(\w+)`)
+	csEnumPattern      = regexp.MustCompile(`^(?:(?:public|private|protected|internal)\s+)*enum\s+(\w+)`)
+	csRecordPattern    = regexp.MustCompile(`^(?:(?:public|private|protected|internal|sealed|abstract|partial)\s+)*record\s+(?:struct\s+|class\s+)?(\w+)`)
+	csMethodPattern    = regexp.MustCompile(`^(?:(?:public|private|protected|internal|static|virtual|override|abstract|async|sealed|new|extern)\s+)*(?:[\w<>\[\]?,\s]+)\s+(\w+)\s*\(`)
+	csPropertyPattern  = regexp.MustCompile(`^(?:(?:public|private|protected|internal|static|virtual|override|abstract|new)\s+)*(?:[\w<>\[\]?,]+)\s+(\w+)\s*\{\s*(?:get|set)`)
+	csConstPattern     = regexp.MustCompile(`^(?:(?:public|private|protected|internal)\s+)*const\s+\S+\s+(\w+)\s*=`)
+	csDelegatePattern  = regexp.MustCompile(`^(?:(?:public|private|protected|internal)\s+)*delegate\s+\S+\s+(\w+)\s*[(<]`)
+	csEventPattern     = regexp.MustCompile(`^(?:(?:public|private|protected|internal|static)\s+)*event\s+\S+\s+(\w+)\s*[;{]`)
+	csUsingPattern     = regexp.MustCompile(`^using\s+(?:static\s+)?([\w.]+)\s*;`)
 )
 
 func (p *CSharpParser) ExtractSymbols(content string) []Symbol {

@@ -18,6 +18,26 @@ type JavaScriptParser struct{}
 
 func (p *JavaScriptParser) Name() string         { return "javascript" }
 func (p *JavaScriptParser) Extensions() []string { return []string{".js", ".jsx", ".mjs", ".cjs"} }
+
+func (p *JavaScriptParser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"main"},
+		Keywords: []string{
+			"if", "for", "while", "else", "switch", "case", "return",
+			"break", "continue", "throw", "try", "catch", "finally",
+			"typeof", "instanceof", "new", "delete", "void",
+			"require", "import", "from", "var", "let", "const",
+			"function", "class", "async", "await", "yield",
+			"super", "this", "of", "in",
+			"console", "setTimeout", "setInterval", "clearTimeout",
+			"clearInterval", "Promise", "Array", "Object", "String",
+			"Number", "Boolean", "Math", "JSON", "Date", "RegExp",
+			"parseInt", "parseFloat", "isNaN", "isFinite",
+			"encodeURIComponent", "decodeURIComponent",
+		},
+		CommentPrefixes: []string{"//"},
+	}
+}
 func (p *JavaScriptParser) IsTestFile(path string) bool {
 	lower := strings.ToLower(path)
 	return strings.Contains(lower, ".test.") || strings.Contains(lower, ".spec.") ||
@@ -25,13 +45,13 @@ func (p *JavaScriptParser) IsTestFile(path string) bool {
 }
 
 var (
-	jsFuncDeclPattern    = regexp.MustCompile(`^(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(`)
-	jsArrowConstPattern  = regexp.MustCompile(`^(?:export\s+)?const\s+(\w+)\s*=\s*(?:async\s+)?\(`)
+	jsFuncDeclPattern     = regexp.MustCompile(`^(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(`)
+	jsArrowConstPattern   = regexp.MustCompile(`^(?:export\s+)?const\s+(\w+)\s*=\s*(?:async\s+)?\(`)
 	jsArrowNoParenPattern = regexp.MustCompile(`^(?:export\s+)?const\s+(\w+)\s*=\s*(?:async\s+)?\w+\s*=>`)
-	jsClassPattern       = regexp.MustCompile(`^(?:export\s+)?(?:default\s+)?class\s+(\w+)`)
-	jsMethodPattern      = regexp.MustCompile(`^\s+(?:async\s+)?(\w+)\s*\(`)
-	jsConstPattern       = regexp.MustCompile(`^(?:export\s+)?const\s+(\w+)\s*=\s*[^(]`)
-	jsLetVarPattern      = regexp.MustCompile(`^(?:export\s+)?(?:let|var)\s+(\w+)\s*=`)
+	jsClassPattern        = regexp.MustCompile(`^(?:export\s+)?(?:default\s+)?class\s+(\w+)`)
+	jsMethodPattern       = regexp.MustCompile(`^\s+(?:async\s+)?(\w+)\s*\(`)
+	jsConstPattern        = regexp.MustCompile(`^(?:export\s+)?const\s+(\w+)\s*=\s*[^(]`)
+	jsLetVarPattern       = regexp.MustCompile(`^(?:export\s+)?(?:let|var)\s+(\w+)\s*=`)
 )
 
 func (p *JavaScriptParser) ExtractSymbols(content string) []Symbol {

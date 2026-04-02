@@ -23,6 +23,27 @@ func (p *PythonParser) IsTestFile(path string) bool {
 	return strings.Contains(base, "test_") || strings.HasSuffix(base, "_test.py")
 }
 
+func (p *PythonParser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"main"},
+		IsEntryFile: func(content string) bool {
+			return strings.Contains(content, `if __name__`)
+		},
+		Keywords: []string{
+			"if", "for", "while", "else", "elif", "try", "except", "finally",
+			"raise", "import", "from", "class", "def", "return", "yield",
+			"async", "await", "with", "as", "pass", "break", "continue",
+			"lambda", "print", "len", "range", "type", "super", "self",
+			"isinstance", "issubclass", "hasattr", "getattr", "setattr",
+			"dict", "list", "set", "tuple", "str", "int", "float", "bool",
+			"open", "input", "map", "filter", "zip", "sorted", "reversed",
+			"enumerate", "any", "all", "min", "max", "sum", "abs", "round",
+			"format", "repr", "id", "hash", "vars", "dir", "next", "iter",
+		},
+		CommentPrefixes: []string{"#"},
+	}
+}
+
 var (
 	pyFuncPattern      = regexp.MustCompile(`^(\s*)def\s+(\w+)\s*\(`)
 	pyAsyncFuncPattern = regexp.MustCompile(`^(\s*)async\s+def\s+(\w+)\s*\(`)

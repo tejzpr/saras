@@ -18,6 +18,24 @@ type CParser struct{}
 
 func (p *CParser) Name() string         { return "c" }
 func (p *CParser) Extensions() []string { return []string{".c", ".h"} }
+
+func (p *CParser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"main"},
+		Keywords: []string{
+			"if", "for", "while", "else", "switch", "case", "return",
+			"break", "continue", "do", "goto", "sizeof", "typeof",
+			"struct", "enum", "union", "typedef",
+			"printf", "fprintf", "sprintf", "snprintf", "scanf",
+			"malloc", "calloc", "realloc", "free",
+			"memcpy", "memset", "memmove", "strlen", "strcmp", "strcpy",
+			"fopen", "fclose", "fread", "fwrite", "fgets", "fputs",
+			"exit", "abort", "assert",
+		},
+		CommentPrefixes: []string{"//"},
+	}
+}
+
 func (p *CParser) IsTestFile(path string) bool {
 	lower := strings.ToLower(path)
 	return strings.Contains(lower, "test") && strings.HasSuffix(lower, ".c")

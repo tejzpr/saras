@@ -18,6 +18,25 @@ type KotlinParser struct{}
 
 func (p *KotlinParser) Name() string         { return "kotlin" }
 func (p *KotlinParser) Extensions() []string { return []string{".kt", ".kts"} }
+
+func (p *KotlinParser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"main"},
+		Keywords: []string{
+			"if", "for", "while", "else", "when", "return",
+			"break", "continue", "throw", "try", "catch", "finally",
+			"this", "super", "class", "object", "fun", "val", "var",
+			"import", "package", "is", "as", "in", "typealias",
+			"abstract", "open", "sealed", "data", "inner", "companion",
+			"override", "lateinit", "by", "constructor", "init",
+			"println", "print", "require", "check", "error",
+			"listOf", "mapOf", "setOf", "mutableListOf", "mutableMapOf",
+			"arrayOf", "emptyList", "emptyMap",
+		},
+		CommentPrefixes: []string{"//"},
+	}
+}
+
 func (p *KotlinParser) IsTestFile(path string) bool {
 	lower := strings.ToLower(path)
 	return strings.HasSuffix(lower, "test.kt") || strings.Contains(lower, "/test/")

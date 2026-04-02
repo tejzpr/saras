@@ -158,6 +158,33 @@ func (p *Pipeline) Ask(ctx context.Context, opts AskOptions) (<-chan StreamChunk
 	return ch, nil
 }
 
+// AskWithContext streams an LLM response using the provided context string
+// instead of performing a search. Useful for explaining pre-built content
+// like flow trees or architecture maps.
+func (p *Pipeline) AskWithContext(ctx context.Context, systemPrompt, contextStr, question string, opts AskOptions) (<-chan StreamChunk, error) {
+	if opts.MaxTokens <= 0 {
+		opts.MaxTokens = 2048
+	}
+	if opts.Temperature <= 0 {
+		opts.Temperature = 0.1
+	}
+	if opts.Model != "" {
+		p.model = opts.Model
+	}
+
+	messages := []Message{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: fmt.Sprintf("%s\n\nQuestion: %s", contextStr, question)},
+	}
+
+	ch, err := p.streamChat(ctx, messages, opts)
+	if err != nil {
+		return nil, fmt.Errorf("chat: %w", err)
+	}
+
+	return ch, nil
+}
+
 // AskSync performs a non-streaming RAG query and returns the full response.
 func (p *Pipeline) AskSync(ctx context.Context, opts AskOptions) (string, error) {
 	ch, err := p.Ask(ctx, opts)

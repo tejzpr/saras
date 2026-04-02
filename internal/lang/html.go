@@ -18,6 +18,13 @@ type HTMLParser struct{}
 
 func (p *HTMLParser) Name() string         { return "html" }
 func (p *HTMLParser) Extensions() []string { return []string{".html", ".htm"} }
+
+func (p *HTMLParser) FlowHints() FlowHints {
+	return FlowHints{
+		CommentPrefixes: []string{"<!--"},
+	}
+}
+
 func (p *HTMLParser) IsTestFile(path string) bool {
 	return false
 }

@@ -161,6 +161,124 @@ func IsSupported(path string) bool {
 	return ParserForFile(path) != nil
 }
 
+// ---------------------------------------------------------------------------
+// Flow hints — optional per-language metadata for call-graph analysis
+// ---------------------------------------------------------------------------
+
+// FlowHints provides language-specific metadata that improves accuracy of
+// entry-point detection and call-graph analysis in the "flow" command.
+type FlowHints struct {
+	// EntryFunctions lists function names that serve as entry points
+	// (e.g. "main" for Go/C/Rust, "Main" for C#).
+	EntryFunctions []string
+
+	// IsEntryFile reports whether file content can host an entry point
+	// (e.g. "package main" for Go). Nil means always true.
+	IsEntryFile func(content string) bool
+
+	// Keywords lists language keywords and builtins to exclude from
+	// call detection (e.g. "if", "for", "make", "len").
+	Keywords []string
+
+	// CommentPrefixes lists single-line comment prefixes (e.g. "//", "#").
+	CommentPrefixes []string
+}
+
+// FlowHinter is an optional interface that language parsers can implement
+// to provide hints for the flow command's call-graph analysis.
+// Parsers that do not implement this interface get sensible defaults.
+type FlowHinter interface {
+	FlowHints() FlowHints
+}
+
+// GetFlowHints returns flow hints for the language of the given file path.
+// If the parser does not implement FlowHinter, default hints are returned.
+func GetFlowHints(path string) FlowHints {
+	p := ParserForFile(path)
+	if p == nil {
+		return defaultFlowHints()
+	}
+	if fh, ok := p.(FlowHinter); ok {
+		return fh.FlowHints()
+	}
+	return defaultFlowHints()
+}
+
+// GetFlowHintsByName returns flow hints for the named language.
+func GetFlowHintsByName(name string) FlowHints {
+	p := ParserByName(name)
+	if p == nil {
+		return defaultFlowHints()
+	}
+	if fh, ok := p.(FlowHinter); ok {
+		return fh.FlowHints()
+	}
+	return defaultFlowHints()
+}
+
+// AllFlowHints returns merged flow hints across all registered languages.
+// This is useful for building a combined keyword skip list.
+func AllFlowHints() FlowHints {
+	registryMu.RLock()
+	defer registryMu.RUnlock()
+
+	kw := make(map[string]bool)
+	cp := make(map[string]bool)
+	ef := make(map[string]bool)
+
+	for _, p := range byName {
+		var h FlowHints
+		if fh, ok := p.(FlowHinter); ok {
+			h = fh.FlowHints()
+		} else {
+			h = defaultFlowHints()
+		}
+		for _, k := range h.Keywords {
+			kw[k] = true
+		}
+		for _, c := range h.CommentPrefixes {
+			cp[c] = true
+		}
+		for _, e := range h.EntryFunctions {
+			ef[e] = true
+		}
+	}
+
+	return FlowHints{
+		EntryFunctions:  mapKeys(ef),
+		Keywords:        mapKeys(kw),
+		CommentPrefixes: mapKeys(cp),
+	}
+}
+
+func defaultFlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions:  []string{"main"},
+		Keywords:        cFamilyKeywords(),
+		CommentPrefixes: []string{"//"},
+	}
+}
+
+func mapKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
+// Shared keyword sets that parsers can compose.
+
+func cFamilyKeywords() []string {
+	return []string{
+		"if", "for", "while", "else", "switch", "case", "return",
+		"break", "continue", "do", "goto", "sizeof", "typeof",
+		"new", "delete", "throw", "try", "catch", "finally",
+		"this", "super", "class", "struct", "enum", "interface",
+		"import", "package", "namespace", "using",
+	}
+}
+
 func normalizeExt(ext string) string {
 	ext = strings.ToLower(ext)
 	if ext != "" && ext[0] != '.' {

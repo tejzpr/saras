@@ -18,6 +18,22 @@ type ZigParser struct{}
 
 func (p *ZigParser) Name() string         { return "zig" }
 func (p *ZigParser) Extensions() []string { return []string{".zig"} }
+
+func (p *ZigParser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"main"},
+		Keywords: []string{
+			"if", "for", "while", "else", "switch", "return",
+			"break", "continue", "try", "catch", "defer", "errdefer",
+			"unreachable", "comptime", "inline", "noalias",
+			"fn", "struct", "enum", "union", "const", "var",
+			"pub", "extern", "export", "test",
+			"undefined", "null", "true", "false",
+		},
+		CommentPrefixes: []string{"//"},
+	}
+}
+
 func (p *ZigParser) IsTestFile(path string) bool {
 	lower := strings.ToLower(path)
 	return strings.Contains(lower, "test") && strings.HasSuffix(lower, ".zig")

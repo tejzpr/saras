@@ -16,8 +16,30 @@ func init() { Register(&GoParser{}) }
 // GoParser extracts symbols from Go source files.
 type GoParser struct{}
 
-func (p *GoParser) Name() string          { return "go" }
-func (p *GoParser) Extensions() []string  { return []string{".go"} }
+func (p *GoParser) Name() string         { return "go" }
+func (p *GoParser) Extensions() []string { return []string{".go"} }
+
+func (p *GoParser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"main", "init"},
+		IsEntryFile: func(content string) bool {
+			for _, line := range strings.Split(content, "\n") {
+				t := strings.TrimSpace(line)
+				if strings.HasPrefix(t, "package ") {
+					return strings.TrimSpace(strings.TrimPrefix(t, "package")) == "main"
+				}
+			}
+			return false
+		},
+		Keywords: []string{
+			"if", "for", "switch", "select", "go", "defer", "return", "range",
+			"case", "make", "len", "cap", "new", "append", "copy", "delete",
+			"close", "panic", "recover", "print", "println", "complex", "real",
+			"imag", "func", "type", "map", "chan", "var", "const", "fallthrough",
+		},
+		CommentPrefixes: []string{"//"},
+	}
+}
 func (p *GoParser) IsTestFile(path string) bool {
 	return strings.HasSuffix(path, "_test.go")
 }

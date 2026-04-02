@@ -16,8 +16,30 @@ func init() { Register(&PHPParser{}) }
 // PHPParser extracts symbols from PHP source files.
 type PHPParser struct{}
 
-func (p *PHPParser) Name() string         { return "php" }
-func (p *PHPParser) Extensions() []string { return []string{".php", ".phtml", ".php3", ".php4", ".php5"} }
+func (p *PHPParser) Name() string { return "php" }
+func (p *PHPParser) Extensions() []string {
+	return []string{".php", ".phtml", ".php3", ".php4", ".php5"}
+}
+
+func (p *PHPParser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"main"},
+		Keywords: []string{
+			"if", "for", "while", "else", "elseif", "foreach", "switch", "case",
+			"return", "break", "continue", "throw", "try", "catch", "finally",
+			"new", "echo", "print", "isset", "unset", "empty",
+			"array", "list", "class", "function", "namespace", "use",
+			"require", "include", "require_once", "include_once",
+			"static", "abstract", "final", "public", "private", "protected",
+			"self", "parent", "trait", "interface",
+			"var_dump", "print_r", "die", "exit",
+			"count", "strlen", "array_push", "array_pop", "array_map",
+			"array_filter", "array_merge", "in_array", "implode", "explode",
+		},
+		CommentPrefixes: []string{"//", "#"},
+	}
+}
+
 func (p *PHPParser) IsTestFile(path string) bool {
 	lower := strings.ToLower(path)
 	return strings.HasSuffix(lower, "test.php") ||
@@ -26,14 +48,14 @@ func (p *PHPParser) IsTestFile(path string) bool {
 }
 
 var (
-	phpNamespacePattern  = regexp.MustCompile(`^namespace\s+([\w\\]+)\s*;`)
-	phpClassPattern      = regexp.MustCompile(`^(?:(?:abstract|final)\s+)*class\s+(\w+)`)
-	phpInterfacePattern  = regexp.MustCompile(`^interface\s+(\w+)`)
-	phpTraitPattern      = regexp.MustCompile(`^trait\s+(\w+)`)
-	phpEnumPattern       = regexp.MustCompile(`^enum\s+(\w+)`)
-	phpFunctionPattern   = regexp.MustCompile(`^(?:(?:public|protected|private|static|abstract|final)\s+)*function\s+(\w+)\s*\(`)
-	phpConstPattern      = regexp.MustCompile(`^(?:(?:public|protected|private)\s+)?const\s+(\w+)\s*=`)
-	phpDefinePattern     = regexp.MustCompile(`^define\s*\(\s*['"](\w+)['"]`)
+	phpNamespacePattern   = regexp.MustCompile(`^namespace\s+([\w\\]+)\s*;`)
+	phpClassPattern       = regexp.MustCompile(`^(?:(?:abstract|final)\s+)*class\s+(\w+)`)
+	phpInterfacePattern   = regexp.MustCompile(`^interface\s+(\w+)`)
+	phpTraitPattern       = regexp.MustCompile(`^trait\s+(\w+)`)
+	phpEnumPattern        = regexp.MustCompile(`^enum\s+(\w+)`)
+	phpFunctionPattern    = regexp.MustCompile(`^(?:(?:public|protected|private|static|abstract|final)\s+)*function\s+(\w+)\s*\(`)
+	phpConstPattern       = regexp.MustCompile(`^(?:(?:public|protected|private)\s+)?const\s+(\w+)\s*=`)
+	phpDefinePattern      = regexp.MustCompile(`^define\s*\(\s*['"](\w+)['"]`)
 	phpTopFunctionPattern = regexp.MustCompile(`^function\s+(\w+)\s*\(`)
 )
 

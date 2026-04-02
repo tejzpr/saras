@@ -23,6 +23,28 @@ type Python2Parser struct{}
 
 func (p *Python2Parser) Name() string         { return "python2" }
 func (p *Python2Parser) Extensions() []string { return []string{".py2", ".pyw"} }
+
+func (p *Python2Parser) FlowHints() FlowHints {
+	return FlowHints{
+		EntryFunctions: []string{"main"},
+		IsEntryFile: func(content string) bool {
+			return strings.Contains(content, `if __name__`)
+		},
+		Keywords: []string{
+			"if", "for", "while", "else", "elif", "try", "except", "finally",
+			"raise", "import", "from", "class", "def", "return", "yield",
+			"with", "as", "pass", "break", "continue",
+			"lambda", "print", "len", "range", "xrange", "type", "super", "self",
+			"isinstance", "issubclass", "hasattr", "getattr", "setattr",
+			"dict", "list", "set", "tuple", "str", "int", "float", "bool",
+			"raw_input", "input", "map", "filter", "zip", "sorted", "reversed",
+			"enumerate", "any", "all", "min", "max", "sum", "abs", "round",
+			"unicode", "basestring", "long", "execfile",
+		},
+		CommentPrefixes: []string{"#"},
+	}
+}
+
 func (p *Python2Parser) IsTestFile(path string) bool {
 	base := strings.ToLower(path)
 	return strings.Contains(base, "test_") || strings.HasSuffix(base, "_test.py2") || strings.HasSuffix(base, "_test.pyw")
