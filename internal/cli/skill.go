@@ -18,11 +18,11 @@ import (
 func init() {
 	rootCmd.AddCommand(installCmd)
 	installCmd.AddCommand(installSkillCmd)
-	installSkillCmd.Flags().Bool("cursor", false, "Install skill for Cursor (.cursor/rules/<project>.mdc)")
+	installSkillCmd.Flags().Bool("cursor", false, "Install skill and rule for Cursor (.cursor/skills/<project>/SKILL.md + .cursor/rules/<project>.mdc)")
 	installSkillCmd.Flags().Bool("windsurf", false, "Install skill for Windsurf (.windsurf/skills/<project>/SKILL.md)")
 	installSkillCmd.Flags().Bool("claude", false, "Install skill for Claude Code (.claude/skills/<project>/SKILL.md)")
 	installSkillCmd.Flags().Bool("codex", false, "Install skill for OpenAI Codex (.agents/skills/<project>/SKILL.md)")
-	installSkillCmd.Flags().Bool("copilot", false, "Install skill for GitHub Copilot (.github/copilot-instructions.md)")
+	installSkillCmd.Flags().Bool("copilot", false, "Install skill for GitHub Copilot (.github/skills/<project>/SKILL.md + .github/copilot-instructions.md)")
 }
 
 var installCmd = &cobra.Command{
@@ -41,11 +41,11 @@ the skill matches the project (e.g. directory "myapp" → skill name "myapp").
 
 Pass one or more editor flags to specify which agents to install for:
 
-  --cursor     .cursor/rules/<project>.mdc
+  --cursor     .cursor/skills/<project>/SKILL.md + .cursor/rules/<project>.mdc
   --windsurf   .windsurf/skills/<project>/SKILL.md
   --claude     .claude/skills/<project>/SKILL.md
   --codex      .agents/skills/<project>/SKILL.md
-  --copilot    .github/copilot-instructions.md
+  --copilot    .github/skills/<project>/SKILL.md + .github/copilot-instructions.md
 
 Examples:
   saras install skill --claude
@@ -72,8 +72,22 @@ func runInstallSkill(cmd *cobra.Command, args []string) error {
 		{"claude", filepath.Join(cwd, ".claude", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
 		{"codex", filepath.Join(cwd, ".agents", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
 		{"windsurf", filepath.Join(cwd, ".windsurf", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
-		{"cursor", filepath.Join(cwd, ".cursor", "rules", projectName+".mdc"), skillContentCursor()},
-		{"copilot", filepath.Join(cwd, ".github", "copilot-instructions.md"), ""},
+		{"cursor", filepath.Join(cwd, ".cursor", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
+		{"copilot", filepath.Join(cwd, ".github", "skills", projectName, "SKILL.md"), skillContentAgentSkills(projectName)},
+	}
+
+	// Cursor also gets a rule file (.mdc) in addition to the skill
+	cursorRule := editorSkill{
+		"cursor",
+		filepath.Join(cwd, ".cursor", "rules", projectName+".mdc"),
+		skillContentCursor(),
+	}
+
+	// Copilot also gets a copilot-instructions.md in addition to the skill
+	copilotInstructions := editorSkill{
+		"copilot",
+		filepath.Join(cwd, ".github", "copilot-instructions.md"),
+		"",
 	}
 
 	installed := 0
@@ -83,14 +97,25 @@ func runInstallSkill(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		content := ed.content
-		if ed.name == "copilot" {
-			content = skillContentCopilot(ed.path)
-		}
-
-		if err := installSkillFile(cmd, ed.name, ed.path, content); err != nil {
+		if err := installSkillFile(cmd, ed.name, ed.path, ed.content); err != nil {
 			return err
 		}
+
+		// Install the additional Cursor rule file
+		if ed.name == "cursor" {
+			if err := installSkillFile(cmd, "cursor (rule)", cursorRule.path, cursorRule.content); err != nil {
+				return err
+			}
+		}
+
+		// Install the additional Copilot instructions file
+		if ed.name == "copilot" {
+			content := skillContentCopilot(copilotInstructions.path)
+			if err := installSkillFile(cmd, "copilot (instructions)", copilotInstructions.path, content); err != nil {
+				return err
+			}
+		}
+
 		installed++
 	}
 

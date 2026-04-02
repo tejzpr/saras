@@ -31,7 +31,8 @@ Commands:
   ask      Ask a question about your codebase (LLM-powered)
   trace    Explore callers, callees, and the call graph
   map      Generate an architecture overview
-  serve    Start the MCP server for AI agent integration`,
+  serve    Start the MCP server for AI agent integration
+  update   Update saras to the latest version`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

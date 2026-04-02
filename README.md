@@ -52,6 +52,14 @@ go install github.com/tejzpr/saras/cmd/saras@latest
 curl -sSfL https://raw.githubusercontent.com/tejzpr/saras/main/install.sh | bash
 ```
 
+### Update
+
+```bash
+saras update
+```
+
+Checks GitHub for the latest release and updates the binary in-place. No update is performed if you're already on the latest version.
+
 ### Initialize
 
 ```bash
@@ -134,10 +142,10 @@ Install skill files that teach AI coding agents how to use saras:
 
 ```bash
 saras install skill --windsurf   # .windsurf/skills/<project>/SKILL.md
-saras install skill --cursor     # .cursor/rules/<project>.mdc
+saras install skill --cursor     # .cursor/skills/<project>/SKILL.md + .cursor/rules/<project>.mdc
 saras install skill --claude      # .claude/skills/<project>/SKILL.md
 saras install skill --codex       # .agents/skills/<project>/SKILL.md
-saras install skill --copilot     # .github/copilot-instructions.md
+saras install skill --copilot     # .github/skills/<project>/SKILL.md + .github/copilot-instructions.md
 ```
 
 The skill name and folder are derived from the current directory name so they match the project.
