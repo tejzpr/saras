@@ -30,6 +30,16 @@ AI coding agents today hit context window limits fast. A single "explain how aut
 - **Watch** — Live file watcher with automatic re-indexing
 - **MCP Server** — Expose all tools to AI agents via Model Context Protocol
 
+## Prerequisites
+
+Saras requires an **embedding model** (to index your code) and an **LLM** (for Ask and AGENTS.md generation). You can use any of these providers:
+
+| Provider | Setup |
+|----------|-------|
+| [Ollama](https://ollama.com/) (recommended) | `ollama pull nomic-embed-text && ollama pull qwen3.5:2b` |
+| [LM Studio](https://lmstudio.ai/) | Download an embedding model and a chat model |
+| OpenAI-compatible | Any endpoint that speaks the OpenAI API (requires API key) |
+
 ## Quick Start
 
 ### Install
