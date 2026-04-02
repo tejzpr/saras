@@ -236,7 +236,10 @@ saras flow                    # all entry points
 saras flow full               # same as above
 saras flow HandleRequest      # from a specific function
 saras flow --depth 3          # limit depth (default: 8)
-saras flow explain --no-tui            # LLM-powered explanation of the flow
+saras flow -o FLOW.md         # write to file
+saras flow explain --no-tui            # concise LLM summary of the flow
+saras flow explain full --no-tui       # exhaustive deep-dive analysis
+saras flow explain full --no-tui -o EXPLAIN.md  # deep-dive to file
 saras flow explain runSearch --no-tui  # explain a specific function's flow
 ` + "```" + `
 
@@ -314,7 +317,10 @@ saras flow                    # all entry points
 saras flow full               # same as above
 saras flow HandleRequest      # from a specific function
 saras flow --depth 3          # limit depth (default: 8)
-saras flow explain --no-tui            # LLM-powered explanation of the flow
+saras flow -o FLOW.md         # write to file
+saras flow explain --no-tui            # concise LLM summary of the flow
+saras flow explain full --no-tui       # exhaustive deep-dive analysis
+saras flow explain full --no-tui -o EXPLAIN.md  # deep-dive to file
 saras flow explain runSearch --no-tui  # explain a specific function's flow
 ` + "```" + `
 
@@ -387,7 +393,10 @@ saras flow                    # all entry points
 saras flow full               # same as above
 saras flow HandleRequest      # from a specific function
 saras flow --depth 3          # limit depth (default: 8)
-saras flow explain --no-tui            # LLM-powered explanation of the flow
+saras flow -o FLOW.md         # write to file
+saras flow explain --no-tui            # concise LLM summary of the flow
+saras flow explain full --no-tui       # exhaustive deep-dive analysis
+saras flow explain full --no-tui -o EXPLAIN.md  # deep-dive to file
 saras flow explain runSearch --no-tui  # explain a specific function's flow
 ` + "```" + `
 

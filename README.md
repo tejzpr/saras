@@ -113,9 +113,11 @@ saras flow full               # same as above (explicit)
 saras flow runSearch          # call tree from a specific function
 saras flow --depth 3          # limit tree depth (default: 8)
 saras flow -o FLOW.md         # write to file
-saras flow explain            # LLM-powered explanation of all entry point flows
+saras flow explain            # concise LLM summary of all entry points
+saras flow explain full       # exhaustive deep-dive (depth 12, detailed analysis)
 saras flow explain runSearch  # explain a specific function's flow
 saras flow explain --no-tui   # plain stdout output
+saras flow explain full --no-tui  # deep-dive, plain stdout
 ```
 
 Entry points are auto-detected across all supported languages: `main()` / `init()` in Go, `main` in C/C++/Rust/Zig/Kotlin, `Main` in C#, `main()` guarded by `if __name__` in Python, `public static void main` in Java, plus Cobra command handlers (`RunE`/`Run`) and HTTP handlers. Each language plugin provides its own keyword list, comment syntax, and entry-point heuristics for accurate call-graph analysis. Ambiguous method resolutions (e.g. interface methods implemented on multiple types) are omitted for accuracy. Markers indicate cycles `(cycle)`, already-expanded nodes `(↩)`, and depth limits `(...)`.

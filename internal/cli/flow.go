@@ -66,12 +66,14 @@ var flowExplainCmd = &cobra.Command{
 	Long: `Generate a call-flow tree and send it to your configured LLM for a
 natural-language explanation of how execution flows through the codebase.
 
-Without arguments (or with "full"), explains all detected entry points.
+Without arguments, provides a concise high-level summary of all entry points.
+With "full", performs an exhaustive deep-dive: higher depth (12), detailed
+per-entry-point analysis, shared infrastructure, patterns, and data flow.
 With a function name, explains the call tree from that specific function.
 
 Examples:
-  saras flow explain                # explain all entry points
-  saras flow explain full           # same as above
+  saras flow explain                # concise summary of all entry points
+  saras flow explain full           # exhaustive deep-dive analysis
   saras flow explain handleRequest  # explain a specific function's flow
   saras flow explain --no-tui       # plain stdout output
   saras flow explain -o EXPLAIN.md  # write to file`,
@@ -137,6 +139,25 @@ Instructions:
 - Use markdown formatting with headers and bullet points.
 - Be concise. Aim for a useful summary, not an exhaustive line-by-line walkthrough.`
 
+const flowExplainFullSystemPrompt = `You are Saras, a senior code-flow analyst performing a comprehensive deep-dive analysis. You receive a call-flow tree generated from a codebase and produce an exhaustive, detailed explanation.
+
+Instructions:
+- Analyze EVERY entry point and its complete call chain in detail.
+- For each entry point, explain:
+  - What triggers it (CLI command, HTTP request, lifecycle event, etc.)
+  - The step-by-step sequence of function calls it makes
+  - What each called function does and why it is called at that point
+  - How data flows between the functions (setup, transformation, persistence, I/O)
+  - Error handling patterns and cleanup/defer behavior if visible
+- Dedicate a full section (## heading) to each entry point.
+- After analyzing all entry points, provide:
+  - A "Shared Infrastructure" section identifying functions called by multiple entry points
+  - A "Key Patterns" section covering: initialization patterns, dependency injection, fan-out hotspots, recursive structures, and cycle analysis
+  - A "Data Flow Summary" describing how data moves through the system end-to-end
+- Reference function names and file paths exactly as shown in the tree.
+- Use markdown with ## headings per entry point, ### subheadings for phases, and bullet points for details.
+- Be thorough — this is a complete architectural walkthrough, not a summary.`
+
 func runFlowExplain(cmd *cobra.Command, args []string) error {
 	depth, _ := cmd.Flags().GetInt("depth")
 	outputFile, _ := cmd.Flags().GetString("output")
@@ -161,8 +182,18 @@ func runFlowExplain(cmd *cobra.Command, args []string) error {
 
 	var flowOutput string
 	var question string
+	var systemPrompt string
+	fullMode := len(args) > 0 && args[0] == "full"
 
-	if len(args) == 0 || args[0] == "full" {
+	if fullMode {
+		// Deep-dive mode: use higher depth and more detailed prompts
+		if !cmd.Flags().Changed("depth") {
+			depth = 12
+		}
+		if !cmd.Flags().Changed("max-tokens") {
+			maxTokens = 8192
+		}
+		fm = architect.NewFlowMapper(projectRoot, cfg.Ignore, depth)
 		trees, err := fm.GenerateFullFlow(ctx)
 		if err != nil {
 			return fmt.Errorf("generate flow: %w", err)
@@ -171,6 +202,18 @@ func runFlowExplain(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("no entry points detected")
 		}
 		flowOutput = architect.FormatFlowTrees(trees)
+		systemPrompt = flowExplainFullSystemPrompt
+		question = "Perform a comprehensive deep-dive analysis of this codebase's execution flow. Analyze every entry point exhaustively, explain each function's role in the call chain, identify shared infrastructure, and describe the overall architecture and data flow patterns."
+	} else if len(args) == 0 {
+		trees, err := fm.GenerateFullFlow(ctx)
+		if err != nil {
+			return fmt.Errorf("generate flow: %w", err)
+		}
+		if len(trees) == 0 {
+			return fmt.Errorf("no entry points detected")
+		}
+		flowOutput = architect.FormatFlowTrees(trees)
+		systemPrompt = flowExplainSystemPrompt
 		question = "Explain the execution flow of this codebase starting from all entry points. Describe what each entry point does and how the call chains fan out."
 	} else {
 		tree, err := fm.GenerateFunctionFlow(ctx, args[0])
@@ -178,6 +221,7 @@ func runFlowExplain(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("generate flow: %w", err)
 		}
 		flowOutput = architect.FormatFlowTree(tree)
+		systemPrompt = flowExplainSystemPrompt
 		question = fmt.Sprintf("Explain the execution flow starting from the function %q. Describe what it does and how its call chain fans out.", args[0])
 	}
 
@@ -217,7 +261,7 @@ func runFlowExplain(cmd *cobra.Command, args []string) error {
 
 	// Step 3: Send flow tree to LLM
 	contextStr := fmt.Sprintf("Call-flow tree:\n```\n%s```", flowOutput)
-	ch, err := pipeline.AskWithContext(ctx, flowExplainSystemPrompt, contextStr, question, askOpts)
+	ch, err := pipeline.AskWithContext(ctx, systemPrompt, contextStr, question, askOpts)
 	if err != nil {
 		return fmt.Errorf("explain flow: %w", err)
 	}
