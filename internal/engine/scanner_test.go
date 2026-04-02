@@ -273,7 +273,7 @@ func TestIsTextFile(t *testing.T) {
 	}
 }
 
-func TestParseGitignoreLine(t *testing.T) {
+func TestParseIgnoreLine(t *testing.T) {
 	tests := []struct {
 		line     string
 		pattern  string
@@ -290,7 +290,7 @@ func TestParseGitignoreLine(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.line, func(t *testing.T) {
-			p := parseGitignoreLine(tc.line)
+			p := parseIgnoreLine(tc.line)
 			if p.pattern != tc.pattern {
 				t.Errorf("pattern: expected %q, got %q", tc.pattern, p.pattern)
 			}

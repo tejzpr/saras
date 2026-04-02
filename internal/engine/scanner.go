@@ -7,7 +7,6 @@
 package engine
 
 import (
-	"bufio"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,30 +22,19 @@ type FileMeta struct {
 }
 
 // Scanner walks a project directory and discovers indexable source files,
-// respecting .gitignore patterns and a configurable ignore list.
+// respecting .gitignore / .sarasignore patterns and a configurable ignore list.
 type Scanner struct {
-	root        string
-	ignoreList  []string
-	gitPatterns []ignorePattern
-}
-
-// ignorePattern is a parsed gitignore rule.
-type ignorePattern struct {
-	pattern  string
-	negated  bool
-	dirOnly  bool
-	anchored bool // contains a slash (matches from root)
+	root    string
+	ignorer *IgnoreMatcher
 }
 
 // NewScanner creates a new file scanner rooted at the given directory.
 // ignoreList is the set of directory/file names to always skip (e.g. node_modules, .git).
 func NewScanner(root string, ignoreList []string) *Scanner {
-	s := &Scanner{
-		root:       root,
-		ignoreList: ignoreList,
+	return &Scanner{
+		root:    root,
+		ignorer: NewIgnoreMatcher(root, ignoreList),
 	}
-	s.gitPatterns = s.loadGitignore()
-	return s
 }
 
 // ScanAll returns metadata for every indexable file under the project root.
@@ -64,24 +52,16 @@ func (s *Scanner) ScanAll() ([]FileMeta, error) {
 
 		name := info.Name()
 
-		// Skip hidden files/dirs (except .gitignore itself)
-		if strings.HasPrefix(name, ".") && name != ".gitignore" {
+		// Skip hidden files/dirs (except .gitignore / .sarasignore)
+		if strings.HasPrefix(name, ".") && name != ".gitignore" && name != ".sarasignore" {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 
-		// Check hard-coded ignore list
-		if s.isInIgnoreList(name) {
-			if info.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		// Check gitignore patterns
-		if s.matchesGitignore(relPath, info.IsDir()) {
+		// Check ignore list + gitignore / sarasignore patterns
+		if s.ignorer.IsIgnored(relPath, info.IsDir()) {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
@@ -128,89 +108,6 @@ func (s *Scanner) ScanChanged(since time.Time) ([]FileMeta, error) {
 	return changed, nil
 }
 
-func (s *Scanner) isInIgnoreList(name string) bool {
-	for _, ig := range s.ignoreList {
-		if name == ig {
-			return true
-		}
-	}
-	return false
-}
-
-func (s *Scanner) loadGitignore() []ignorePattern {
-	path := filepath.Join(s.root, ".gitignore")
-	f, err := os.Open(path)
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
-
-	var patterns []ignorePattern
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		p := parseGitignoreLine(line)
-		patterns = append(patterns, p)
-	}
-	return patterns
-}
-
-func parseGitignoreLine(line string) ignorePattern {
-	p := ignorePattern{}
-
-	if strings.HasPrefix(line, "!") {
-		p.negated = true
-		line = line[1:]
-	}
-
-	if strings.HasSuffix(line, "/") {
-		p.dirOnly = true
-		line = strings.TrimSuffix(line, "/")
-	}
-
-	// A pattern with a slash (not just trailing) is anchored to root
-	if strings.Contains(line, "/") {
-		p.anchored = true
-	}
-
-	p.pattern = line
-	return p
-}
-
-func (s *Scanner) matchesGitignore(relPath string, isDir bool) bool {
-	matched := false
-	for _, p := range s.gitPatterns {
-		if p.dirOnly && !isDir {
-			continue
-		}
-
-		doesMatch := false
-		if p.anchored {
-			// Match against full relative path
-			doesMatch, _ = filepath.Match(p.pattern, relPath)
-		} else {
-			// Match against basename
-			doesMatch, _ = filepath.Match(p.pattern, filepath.Base(relPath))
-			if !doesMatch {
-				// Also try matching against full path for patterns like "dir/file"
-				doesMatch, _ = filepath.Match(p.pattern, relPath)
-			}
-		}
-
-		if doesMatch {
-			if p.negated {
-				matched = false
-			} else {
-				matched = true
-			}
-		}
-	}
-	return matched
-}
-
 // isTextFile returns true if the file extension indicates a text/source file.
 var textExtensions = map[string]bool{
 	// Programming languages
@@ -252,7 +149,7 @@ func isTextFile(name string) bool {
 	switch lower {
 	case "makefile", "dockerfile", "rakefile", "gemfile",
 		"cmakelists.txt", "go.mod", "go.sum", "cargo.toml", "cargo.lock",
-		"package.json", "tsconfig.json", ".gitignore", ".dockerignore":
+		"package.json", "tsconfig.json", ".gitignore", ".sarasignore", ".dockerignore":
 		return true
 	}
 	ext := strings.ToLower(filepath.Ext(name))

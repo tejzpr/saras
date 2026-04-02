@@ -206,6 +206,26 @@ ignore:
   - .git
 ```
 
+## `.sarasignore`
+
+You can create a `.sarasignore` file in your project root to exclude additional files and directories from indexing, watching, and scanning. It uses the same syntax as `.gitignore`:
+
+```
+# Exclude generated code
+*.generated.go
+*.pb.go
+
+# Exclude specific directories
+fixtures/
+testdata/
+scripts/
+
+# Exclude by pattern
+docs/*.draft.md
+```
+
+`.sarasignore` patterns are applied **in addition to** `.gitignore` patterns and the `ignore` list in `.saras/config.yaml`. This is useful when you want to exclude files from saras without modifying your `.gitignore` (e.g. large vendored assets, generated code, or documentation that isn't relevant for code search).
+
 ## Architecture
 
 ```

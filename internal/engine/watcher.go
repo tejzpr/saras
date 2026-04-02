@@ -63,14 +63,15 @@ type WatchStats struct {
 type Watcher struct {
 	root       string
 	ignoreList []string
+	ignorer    *IgnoreMatcher
 	debounceMs int
 	fsWatcher  *fsnotify.Watcher
 
-	mu       sync.Mutex
-	stats    WatchStats
-	pending  map[string]WatchEvent // debounce buffer
-	onEvent  func(WatchEvent)      // callback for each debounced event
-	onError  func(error)           // callback for errors
+	mu      sync.Mutex
+	stats   WatchStats
+	pending map[string]WatchEvent // debounce buffer
+	onEvent func(WatchEvent)      // callback for each debounced event
+	onError func(error)           // callback for errors
 
 	done chan struct{}
 }
@@ -107,6 +108,7 @@ func NewWatcher(root string, ignoreList []string, opts ...WatcherOption) (*Watch
 	w := &Watcher{
 		root:       root,
 		ignoreList: ignoreList,
+		ignorer:    NewIgnoreMatcher(root, ignoreList),
 		debounceMs: 500,
 		fsWatcher:  fsw,
 		pending:    make(map[string]WatchEvent),
@@ -157,11 +159,9 @@ func (w *Watcher) addDirectories() error {
 			return filepath.SkipDir
 		}
 
-		// Skip ignored directories
-		for _, ig := range w.ignoreList {
-			if name == ig {
-				return filepath.SkipDir
-			}
+		relPath, _ := filepath.Rel(w.root, path)
+		if relPath != "." && w.ignorer.IsIgnored(relPath, true) {
+			return filepath.SkipDir
 		}
 
 		if err := w.fsWatcher.Add(path); err != nil {
@@ -217,24 +217,21 @@ func (w *Watcher) handleFSEvent(event fsnotify.Event) {
 		}
 	}
 
-	// Skip ignored
-	baseName := filepath.Base(relPath)
-	for _, ig := range w.ignoreList {
-		if baseName == ig {
-			return
-		}
+	// Skip ignored (checks all path components + gitignore/sarasignore patterns)
+	info, statErr := os.Stat(event.Name)
+	isDir := statErr == nil && info.IsDir()
+	if w.ignorer.IsIgnored(relPath, isDir) {
+		return
 	}
 
 	op := fsOpToWatchOp(event.Op)
 
-	// If a new directory was created, start watching it
-	if event.Op.Has(fsnotify.Create) {
-		if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
-			w.fsWatcher.Add(event.Name)
-			w.mu.Lock()
-			w.stats.DirsWatched++
-			w.mu.Unlock()
-		}
+	// If a new directory was created, start watching it (unless ignored)
+	if event.Op.Has(fsnotify.Create) && isDir {
+		w.fsWatcher.Add(event.Name)
+		w.mu.Lock()
+		w.stats.DirsWatched++
+		w.mu.Unlock()
 	}
 
 	we := WatchEvent{
