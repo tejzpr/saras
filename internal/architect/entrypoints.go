@@ -408,6 +408,10 @@ func (fm *FlowMapper) detectEntryPoints(ctx context.Context, symbols []trace.Sym
 	httpEntries := fm.detectHTTPHandlers(symbols)
 	entries = append(entries, httpEntries...)
 
+	// 4. Detect framework convention-based entry points (Struts, Servlet, etc.)
+	fwEntries := fm.detectFrameworkEntryPoints(symbols)
+	entries = append(entries, fwEntries...)
+
 	// Sort: main first, then commands, then handlers, then init
 	sort.Slice(entries, func(i, j int) bool {
 		oi, oj := entryKindOrder(entries[i].Kind), entryKindOrder(entries[j].Kind)
@@ -675,6 +679,153 @@ func (fm *FlowMapper) detectHTTPHandlers(symbols []trace.Symbol) []EntryPoint {
 					}
 				}
 			nextAnnotation:
+			}
+		}
+
+		return nil
+	})
+
+	return entries
+}
+
+// --- Framework convention-based entry point detection -----------------------
+
+// frameworkClassEntry maps a class-inheritance/annotation pattern to the
+// convention entry-method names that should be treated as handlers.
+type frameworkClassEntry struct {
+	// classPattern matches the class declaration line (e.g. "extends ActionSupport")
+	classPattern *regexp.Regexp
+	// methodNames are the convention entry methods for that framework
+	methodNames []string
+	// label is the framework name for display
+	label string
+}
+
+var frameworkConventions = []frameworkClassEntry{
+	// Java Struts: classes extending ActionSupport or implementing Action
+	{
+		classPattern: regexp.MustCompile(`(?:extends\s+(?:ActionSupport|Action|BaseAction))|(?:implements\s+\w*Action)`),
+		methodNames:  []string{"execute", "doExecute", "input", "validate"},
+		label:        "struts",
+	},
+	// Java Servlet: classes extending HttpServlet
+	{
+		classPattern: regexp.MustCompile(`extends\s+HttpServlet`),
+		methodNames:  []string{"doGet", "doPost", "doPut", "doDelete", "doPatch", "service", "init"},
+		label:        "servlet",
+	},
+	// Java Spring: @Controller or @RestController annotated classes
+	{
+		classPattern: regexp.MustCompile(`@(?:Rest)?Controller`),
+		methodNames:  nil, // all methods with @*Mapping annotations (handled by HTTP handler detection)
+		label:        "spring",
+	},
+	// Java JAX-RS: @Path annotated classes
+	{
+		classPattern: regexp.MustCompile(`@Path\s*\(`),
+		methodNames:  nil, // methods with @GET/@POST etc. (handled by HTTP handler detection)
+		label:        "jax-rs",
+	},
+	// C# ASP.NET: classes extending Controller or ControllerBase
+	{
+		classPattern: regexp.MustCompile(`(?:extends|:)\s*(?:Controller|ControllerBase|ApiController)`),
+		methodNames:  []string{"Index", "Create", "Edit", "Delete", "Details", "Update"},
+		label:        "aspnet",
+	},
+	// Python Django: class-based views extending View, ListView, etc.
+	{
+		classPattern: regexp.MustCompile(`class\s+\w+\(.*(?:View|ListView|DetailView|CreateView|UpdateView|DeleteView|FormView|TemplateView)`),
+		methodNames:  []string{"get", "post", "put", "patch", "delete", "dispatch", "get_queryset", "get_context_data", "form_valid"},
+		label:        "django",
+	},
+}
+
+func (fm *FlowMapper) detectFrameworkEntryPoints(symbols []trace.Symbol) []EntryPoint {
+	// Build method lookup: "ClassName.MethodName" and plain "MethodName"
+	type methodKey struct {
+		parent string
+		name   string
+	}
+	methodMap := make(map[methodKey]trace.Symbol)
+	plainMap := make(map[string]trace.Symbol)
+	for _, s := range symbols {
+		if s.Kind == trace.KindMethod {
+			methodMap[methodKey{parent: s.Parent, name: s.Name}] = s
+		}
+		if (s.Kind == trace.KindFunction || s.Kind == trace.KindMethod) && s.Name != "" {
+			if _, exists := plainMap[s.Name]; !exists {
+				plainMap[s.Name] = s
+			}
+		}
+	}
+
+	seen := make(map[string]bool)
+	var entries []EntryPoint
+
+	addEntry := func(sym trace.Symbol, label string) {
+		key := sym.Name + ":" + sym.FilePath
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		entries = append(entries, EntryPoint{
+			Symbol: sym, Kind: EntryHandler, Label: label,
+		})
+	}
+
+	filepath.Walk(fm.root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			return fm.skipDir(info.Name())
+		}
+		if !lang.IsSupported(path) {
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		content := string(data)
+
+		for _, fc := range frameworkConventions {
+			if !fc.classPattern.MatchString(content) {
+				continue
+			}
+
+			if len(fc.methodNames) == 0 {
+				// Annotation-based frameworks — already handled by HTTP handler detection
+				continue
+			}
+
+			// Find the class name from the file
+			lines := strings.Split(content, "\n")
+			for _, line := range lines {
+				if !fc.classPattern.MatchString(line) {
+					continue
+				}
+				// Extract class name
+				classNamePat := regexp.MustCompile(`(?:class|struct)\s+(\w+)`)
+				m := classNamePat.FindStringSubmatch(line)
+				if m == nil {
+					continue
+				}
+				className := m[1]
+
+				// Look for convention methods in this class
+				for _, methodName := range fc.methodNames {
+					// Try ClassName.MethodName first
+					if sym, ok := methodMap[methodKey{parent: className, name: methodName}]; ok {
+						addEntry(sym, fc.label+":"+className+"."+methodName)
+					} else if sym, ok := plainMap[methodName]; ok {
+						// Fallback: match by method name in the same file
+						if sym.FilePath == path {
+							addEntry(sym, fc.label+":"+methodName)
+						}
+					}
+				}
 			}
 		}
 
