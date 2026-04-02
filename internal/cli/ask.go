@@ -15,6 +15,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
+	"github.com/tejzpr/saras/internal/architect"
 	"github.com/tejzpr/saras/internal/ask"
 	"github.com/tejzpr/saras/internal/config"
 	"github.com/tejzpr/saras/internal/embedder"
@@ -50,6 +51,8 @@ func init() {
 	askCmd.Flags().String("model", "", "Override LLM model")
 	askCmd.Flags().Bool("no-tui", false, "Print response to stdout (no interactive TUI)")
 	askCmd.Flags().StringP("output", "o", "", "Write response to file instead of stdout")
+	askCmd.Flags().String("with-flow", "", "Include call-flow tree in context (optional: function name)")
+	askCmd.Flags().Lookup("with-flow").NoOptDefVal = "__all__"
 }
 
 func runAsk(cmd *cobra.Command, args []string) error {
@@ -60,6 +63,7 @@ func runAsk(cmd *cobra.Command, args []string) error {
 	model, _ := cmd.Flags().GetString("model")
 	noTUI, _ := cmd.Flags().GetBool("no-tui")
 	outputFile, _ := cmd.Flags().GetString("output")
+	withFlow, _ := cmd.Flags().GetString("with-flow")
 
 	projectRoot, err := config.FindProjectRoot()
 	if err != nil {
@@ -105,11 +109,27 @@ func runAsk(cmd *cobra.Command, args []string) error {
 
 	pipeline := ask.NewPipeline(searcher, chatEndpoint, chatModel, pipelineOpts...)
 
+	// Build optional flow context
+	var extraContext string
+	if withFlow != "" {
+		flowCtx, err := buildFlowContext(projectRoot, cfg, withFlow)
+		if err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not generate flow context: %v\n", err)
+		} else {
+			extraContext = flowCtx
+			// Reduce RAG limit to leave room for flow data in context window
+			if !cmd.Flags().Changed("limit") && limit > 3 {
+				limit = limit - 2
+			}
+		}
+	}
+
 	opts := ask.AskOptions{
-		Query:       question,
-		Limit:       limit,
-		MaxTokens:   maxTokens,
-		Temperature: temperature,
+		Query:        question,
+		Limit:        limit,
+		MaxTokens:    maxTokens,
+		Temperature:  temperature,
+		ExtraContext: extraContext,
 	}
 
 	if outputFile != "" {
@@ -189,6 +209,37 @@ func runAskTUI(cmd *cobra.Command, pipeline *ask.Pipeline, opts ask.AskOptions) 
 	}
 
 	return nil
+}
+
+const flowHintFooter = "\n\n---\n💡 For deeper analysis, try: `saras flow` (call tree) or `saras flow explain full` (exhaustive LLM walkthrough)."
+
+// buildFlowContext generates a compact call-flow tree (depth 3) for use as
+// additional context in ask queries. If funcName is "__all__" it generates
+// trees from all entry points; otherwise it generates the tree for the named function.
+func buildFlowContext(projectRoot string, cfg *config.Config, funcName string) (string, error) {
+	const compactDepth = 3
+	fm := architect.NewFlowMapper(projectRoot, cfg.Ignore, compactDepth)
+	ctx := context.Background()
+
+	var flowOutput string
+	if funcName == "__all__" {
+		trees, err := fm.GenerateFullFlow(ctx)
+		if err != nil {
+			return "", err
+		}
+		if len(trees) == 0 {
+			return "", fmt.Errorf("no entry points detected")
+		}
+		flowOutput = architect.FormatFlowTrees(trees)
+	} else {
+		tree, err := fm.GenerateFunctionFlow(ctx, funcName)
+		if err != nil {
+			return "", err
+		}
+		flowOutput = architect.FormatFlowTree(tree)
+	}
+
+	return fmt.Sprintf("Call-flow tree (depth %d):\n```\n%s```%s", compactDepth, flowOutput, flowHintFooter), nil
 }
 
 func buildChatEndpoint(cfg *config.Config) string {

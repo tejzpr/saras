@@ -35,11 +35,12 @@ type StreamChunk struct {
 
 // AskOptions configures an ask request.
 type AskOptions struct {
-	Query       string
-	Limit       int
-	MaxTokens   int
-	Temperature float32
-	Model       string
+	Query        string
+	Limit        int
+	MaxTokens    int
+	Temperature  float32
+	Model        string
+	ExtraContext string // optional additional context prepended to RAG results
 }
 
 // Pipeline orchestrates search → context building → LLM chat completion.
@@ -144,9 +145,15 @@ func (p *Pipeline) Ask(ctx context.Context, opts AskOptions) (<-chan StreamChunk
 	codeContext := buildContext(results)
 
 	// Step 3: Build messages
+	var userContent string
+	if opts.ExtraContext != "" {
+		userContent = fmt.Sprintf("%s\n\nCode context:\n%s\n\nQuestion: %s", opts.ExtraContext, codeContext, opts.Query)
+	} else {
+		userContent = fmt.Sprintf("Code context:\n%s\n\nQuestion: %s", codeContext, opts.Query)
+	}
 	messages := []Message{
 		{Role: "system", Content: p.systemPrompt},
-		{Role: "user", Content: fmt.Sprintf("Code context:\n%s\n\nQuestion: %s", codeContext, opts.Query)},
+		{Role: "user", Content: userContent},
 	}
 
 	// Step 4: Stream LLM response

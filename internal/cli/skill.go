@@ -203,6 +203,8 @@ Ask short individual questions per ask to yield faster answers.
 
 ` + "```bash" + `
 saras ask --no-tui "how does the payment flow work?"
+saras ask --no-tui --with-flow "how does auth work?"            # include call-flow tree
+saras ask --no-tui --with-flow=handleAuth "explain error paths" # flow from specific function
 ` + "```" + `
 
 ## Tracing Symbols
@@ -284,6 +286,8 @@ Ask short individual questions per ask to yield faster answers.
 
 ` + "```bash" + `
 saras ask --no-tui "how does the payment flow work?"
+saras ask --no-tui --with-flow "how does auth work?"            # include call-flow tree
+saras ask --no-tui --with-flow=handleAuth "explain error paths" # flow from specific function
 ` + "```" + `
 
 ## Tracing Symbols
@@ -360,6 +364,8 @@ Ask short individual questions per ask to yield faster answers.
 
 ` + "```bash" + `
 saras ask --no-tui "how does the payment flow work?"
+saras ask --no-tui --with-flow "how does auth work?"            # include call-flow tree
+saras ask --no-tui --with-flow=handleAuth "explain error paths" # flow from specific function
 ` + "```" + `
 
 ## Tracing Symbols

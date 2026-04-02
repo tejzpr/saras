@@ -82,9 +82,12 @@ saras search "error handling" --json
 ```bash
 saras ask "how does the login flow work?"
 saras ask "what database connections are used?" --no-tui
+saras ask --with-flow "how does auth work?"            # include call-flow tree in context
+saras ask --with-flow=handleAuth "explain error paths"  # flow from specific function
 ```
 
 With `--no-tui`, responses stream to stdout in real-time as the LLM generates them.
+With `--with-flow`, a compact call-flow tree (depth 3) is prepended to the RAG context, giving the LLM both structural and code-level insight. For deeper flow analysis, use `saras flow explain full`.
 
 ### Trace
 
