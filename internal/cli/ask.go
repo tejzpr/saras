@@ -9,6 +9,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -48,6 +49,7 @@ func init() {
 	askCmd.Flags().Float32("temperature", 0.1, "LLM temperature")
 	askCmd.Flags().String("model", "", "Override LLM model")
 	askCmd.Flags().Bool("no-tui", false, "Print response to stdout (no interactive TUI)")
+	askCmd.Flags().StringP("output", "o", "", "Write response to file instead of stdout")
 }
 
 func runAsk(cmd *cobra.Command, args []string) error {
@@ -57,6 +59,7 @@ func runAsk(cmd *cobra.Command, args []string) error {
 	temperature, _ := cmd.Flags().GetFloat32("temperature")
 	model, _ := cmd.Flags().GetString("model")
 	noTUI, _ := cmd.Flags().GetBool("no-tui")
+	outputFile, _ := cmd.Flags().GetString("output")
 
 	projectRoot, err := config.FindProjectRoot()
 	if err != nil {
@@ -109,11 +112,35 @@ func runAsk(cmd *cobra.Command, args []string) error {
 		Temperature: temperature,
 	}
 
+	if outputFile != "" {
+		return runAskToFile(cmd, pipeline, opts, outputFile)
+	}
+
 	if noTUI {
 		return runAskPlain(cmd, pipeline, opts)
 	}
 
 	return runAskTUI(cmd, pipeline, opts)
+}
+
+func runAskToFile(cmd *cobra.Command, pipeline *ask.Pipeline, opts ask.AskOptions, path string) error {
+	ch, err := pipeline.Ask(context.Background(), opts)
+	if err != nil {
+		return fmt.Errorf("ask: %w", err)
+	}
+
+	var buf strings.Builder
+	for chunk := range ch {
+		if chunk.Err != nil {
+			return fmt.Errorf("ask: %w", chunk.Err)
+		}
+		buf.WriteString(chunk.Content)
+	}
+	if err := os.WriteFile(path, []byte(buf.String()), 0644); err != nil {
+		return fmt.Errorf("write file: %w", err)
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "Written to %s\n", path)
+	return nil
 }
 
 func runAskPlain(cmd *cobra.Command, pipeline *ask.Pipeline, opts ask.AskOptions) error {
