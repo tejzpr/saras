@@ -124,12 +124,15 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	// Index-only mode: run full index then exit
 	if indexOnly {
 		fmt.Fprintln(cmd.OutOrStdout(), "Running full index...")
-		stats, err := indexer.IndexAll(ctx)
+		start := time.Now()
+		stats, err := indexer.IndexAllWithProgress(ctx, func(p engine.ProgressInfo) {
+			fmt.Fprintf(cmd.OutOrStdout(), "\r  [%d/%d] %s", p.Current, p.Total, p.CurrentFile)
+		})
 		if err != nil {
 			return fmt.Errorf("index: %w", err)
 		}
 		st.Persist(ctx)
-		fmt.Fprintf(cmd.OutOrStdout(), "Indexed %d files, %d chunks\n", stats.FilesIndexed, stats.ChunksCreated)
+		fmt.Fprintf(cmd.OutOrStdout(), "\n✓ Indexed %d files, %d chunks in %s\n", stats.FilesIndexed, stats.ChunksCreated, time.Since(start).Round(time.Millisecond))
 		return nil
 	}
 

@@ -246,7 +246,7 @@ saras flow explain runSearch --no-tui  # explain a specific function's flow
 ## Important
 - Always pass --no-tui for ask and flow explain (TUI will block)
 - Do not run saras watch (blocking)
-- No results: run saras init or saras watch
+- No results: run saras init or saras reindex
 - Outputs include paths, lines, relevance
 - Ask is stateless
 - Runs locally
@@ -324,7 +324,7 @@ saras flow explain runSearch --no-tui  # explain a specific function's flow
 ## Important
 - Always pass --no-tui for ask and flow explain (TUI will block)
 - Do not run saras watch (blocking)
-- No results: run saras init or saras watch
+- No results: run saras init or saras reindex
 - Outputs include paths, lines, relevance
 - Ask is stateless
 - Runs locally
@@ -397,7 +397,7 @@ saras flow explain runSearch --no-tui  # explain a specific function's flow
 ## Important
 - Always pass --no-tui for ask and flow explain (TUI will block)
 - Do not run saras watch (blocking)
-- No results: run saras init or saras watch
+- No results: run saras init or saras reindex
 - Outputs include paths, lines, relevance
 - Ask is stateless
 - Runs locally

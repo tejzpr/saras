@@ -120,12 +120,19 @@ saras flow explain --no-tui   # plain stdout output
 
 Entry points are auto-detected across all supported languages: `main()` / `init()` in Go, `main` in C/C++/Rust/Zig/Kotlin, `Main` in C#, `main()` guarded by `if __name__` in Python, `public static void main` in Java, plus Cobra command handlers (`RunE`/`Run`) and HTTP handlers. Each language plugin provides its own keyword list, comment syntax, and entry-point heuristics for accurate call-graph analysis. Ambiguous method resolutions (e.g. interface methods implemented on multiple types) are omitted for accuracy. Markers indicate cycles `(cycle)`, already-expanded nodes `(↩)`, and depth limits `(...)`.
 
+### Reindex
+
+```bash
+saras reindex                  # full re-index with progress
+```
+
 ### Watch
 
 ```bash
 saras watch                    # live TUI dashboard
 saras watch --no-tui           # log mode
 saras watch --index-first=false  # skip initial index
+saras watch --index-only       # full index then exit (with progress)
 ```
 
 ### MCP Server

@@ -120,6 +120,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "  1. Start the watcher:  saras watch\n")
 	fmt.Fprintf(cmd.OutOrStdout(), "  2. Search your code:   saras search \"your query\"\n")
 	fmt.Fprintf(cmd.OutOrStdout(), "  3. Ask questions:      saras ask \"how does auth work?\"\n")
+	fmt.Fprintf(cmd.OutOrStdout(), "  4. Explain flow:      saras flow explain\n")
 
 	return nil
 }
