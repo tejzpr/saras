@@ -73,7 +73,8 @@ type Watcher struct {
 	onEvent func(WatchEvent)      // callback for each debounced event
 	onError func(error)           // callback for errors
 
-	done chan struct{}
+	ready chan struct{} // closed when directory registration is complete
+	done  chan struct{}
 }
 
 // WatcherOption configures a Watcher.
@@ -112,6 +113,7 @@ func NewWatcher(root string, ignoreList []string, opts ...WatcherOption) (*Watch
 		debounceMs: 500,
 		fsWatcher:  fsw,
 		pending:    make(map[string]WatchEvent),
+		ready:      make(chan struct{}),
 		done:       make(chan struct{}),
 	}
 
@@ -122,9 +124,17 @@ func NewWatcher(root string, ignoreList []string, opts ...WatcherOption) (*Watch
 	return w, nil
 }
 
+// Ready returns a channel that is closed once the watcher has finished
+// registering directories and is actively listening for events.
+func (w *Watcher) Ready() <-chan struct{} {
+	return w.ready
+}
+
 // Start begins watching the project directory tree. It blocks until ctx is cancelled.
 func (w *Watcher) Start(ctx context.Context) error {
-	if err := w.addDirectories(); err != nil {
+	err := w.addDirectories()
+	close(w.ready) // signal readiness even on error so waiters don't block
+	if err != nil {
 		return err
 	}
 

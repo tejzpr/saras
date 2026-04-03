@@ -139,17 +139,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	tracker := &watchTracker{}
 
 	if noTUI {
-		// Non-TUI mode: original behaviour
-		if indexFirst {
-			fmt.Fprintln(cmd.OutOrStdout(), "Running initial index...")
-			stats, err := indexer.IndexAll(ctx)
-			if err != nil {
-				return fmt.Errorf("initial index: %w", err)
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Indexed %d files, %d chunks\n", stats.FilesIndexed, stats.ChunksCreated)
-			st.Persist(ctx)
-		}
-
+		// Non-TUI mode
 		watcher, err := engine.NewWatcher(projectRoot, cfg.Ignore,
 			engine.WithDebounce(cfg.Watch.DebounceMs),
 			engine.WithOnEvent(func(e engine.WatchEvent) {
@@ -162,8 +152,26 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("create watcher: %w", err)
 		}
+
+		// Start watcher first so file changes are detected immediately
+		watcherErrCh := make(chan error, 1)
+		go func() {
+			watcherErrCh <- watcher.Start(ctx)
+		}()
+		<-watcher.Ready()
 		fmt.Fprintln(cmd.OutOrStdout(), "Watching for changes... (Ctrl+C to stop)")
-		return watcher.Start(ctx)
+
+		if indexFirst {
+			fmt.Fprintln(cmd.OutOrStdout(), "Running initial index...")
+			stats, err := indexer.IndexAll(ctx)
+			if err != nil {
+				return fmt.Errorf("initial index: %w", err)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Indexed %d files, %d chunks\n", stats.FilesIndexed, stats.ChunksCreated)
+			st.Persist(ctx)
+		}
+
+		return <-watcherErrCh
 	}
 
 	// TUI mode: create the program first so callbacks can send messages
@@ -213,8 +221,21 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create watcher: %w", err)
 	}
 
-	// Run initial index + watcher in background
+	// Start watcher first so file changes are detected immediately
 	go func() {
+		watcher.Start(ctx)
+	}()
+
+	// Wait for directory registration, then send initial stats and index
+	go func() {
+		<-watcher.Ready()
+
+		ws := watcher.Stats()
+		tracker.mu.Lock()
+		tracker.dirsWatched = ws.DirsWatched
+		tracker.mu.Unlock()
+		tracker.sendStats()
+
 		if indexFirst {
 			stats, err := indexer.IndexAll(ctx)
 			if err == nil {
@@ -226,19 +247,6 @@ func runWatch(cmd *cobra.Command, args []string) error {
 				tracker.sendStats()
 			}
 		}
-
-		// Start watcher — also pick up dirs count
-		go func() {
-			watcher.Start(ctx)
-		}()
-
-		// Wait a moment for dirs to be registered, then send initial stats
-		time.Sleep(500 * time.Millisecond)
-		ws := watcher.Stats()
-		tracker.mu.Lock()
-		tracker.dirsWatched = ws.DirsWatched
-		tracker.mu.Unlock()
-		tracker.sendStats()
 	}()
 
 	if _, err := p.Run(); err != nil {
