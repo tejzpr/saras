@@ -27,8 +27,10 @@ type InitResult struct {
 	Model       string
 	Endpoint    string
 	APIKey      string
+	LLMProvider string
 	LLMModel    string
 	LLMEndpoint string
+	LLMAPIKey   string
 	Done        bool
 	Aborted     bool
 }
@@ -40,106 +42,158 @@ const (
 	stepEndpoint
 	stepAPIKey
 	stepModel
-	stepLLMModel
 	stepConfirm
 )
 
-// ollamaModelsMsg is sent when Ollama model list is fetched.
-type ollamaModelsMsg struct {
+type subFocus int
+
+const (
+	focusEmbed subFocus = iota
+	focusLLM
+)
+
+// --- Ollama model fetch messages ---
+
+type ollamaEmbedModelsMsg struct {
 	models []string
 	err    error
 }
 
-// fetchOllamaModels fetches the model list from Ollama's /api/tags endpoint.
-func fetchOllamaModels(endpoint string) tea.Cmd {
+type ollamaLLMModelsMsg struct {
+	models []string
+	err    error
+}
+
+// fetchOllamaModelList fetches model names from an Ollama /api/tags endpoint.
+func fetchOllamaModelList(endpoint string) ([]string, error) {
+	endpoint = strings.TrimRight(endpoint, "/")
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(endpoint + "/api/tags")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Models []struct {
+			Name string `json:"name"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	var names []string
+	for _, m := range result.Models {
+		names = append(names, m.Name)
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+func fetchOllamaEmbedModels(endpoint string) tea.Cmd {
 	return func() tea.Msg {
-		endpoint = strings.TrimRight(endpoint, "/")
-		client := &http.Client{Timeout: 5 * time.Second}
-		resp, err := client.Get(endpoint + "/api/tags")
-		if err != nil {
-			return ollamaModelsMsg{err: err}
-		}
-		defer resp.Body.Close()
+		models, err := fetchOllamaModelList(endpoint)
+		return ollamaEmbedModelsMsg{models: models, err: err}
+	}
+}
 
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return ollamaModelsMsg{err: err}
-		}
-
-		var result struct {
-			Models []struct {
-				Name string `json:"name"`
-			} `json:"models"`
-		}
-		if err := json.Unmarshal(body, &result); err != nil {
-			return ollamaModelsMsg{err: err}
-		}
-
-		var names []string
-		for _, m := range result.Models {
-			names = append(names, m.Name)
-		}
-		sort.Strings(names)
-		return ollamaModelsMsg{models: names}
+func fetchOllamaLLMModels(endpoint string) tea.Cmd {
+	return func() tea.Msg {
+		models, err := fetchOllamaModelList(endpoint)
+		return ollamaLLMModelsMsg{models: models, err: err}
 	}
 }
 
 // InitModel is the Bubble Tea model for the interactive init wizard.
 type InitModel struct {
-	step       initStep
-	provider   int      // selected provider index
-	providers  []string // provider names
-	modelInput textinput.Model
-	endpInput  textinput.Model
-	keyInput   textinput.Model
-	llmInput   textinput.Model
-	result     InitResult
-	width      int
-	height     int
-	quitting   bool
+	step  initStep
+	focus subFocus
 
-	// Ollama model selection
-	ollamaModels   []string // all fetched model names
-	embedModels    []string // filtered: models with "embed" in name
-	llmModels      []string // filtered: models without "embed"
-	embedCursor    int      // cursor for embed model selection
-	llmCursor      int      // cursor for LLM model selection
-	fetchingModels bool     // true while fetching
-	fetchErr       error    // set if fetch failed
+	// Provider selection
+	providers     []string
+	embedProvider int
+	llmProvider   int
+
+	// Text inputs
+	embedEndpInput  textinput.Model
+	llmEndpInput    textinput.Model
+	embedKeyInput   textinput.Model
+	llmKeyInput     textinput.Model
+	embedModelInput textinput.Model
+	llmModelInput   textinput.Model
+
+	// Ollama embed model selection
+	embedModelList   []string // filtered: "embed" in name
+	embedModelCursor int
+	embedFetching    bool
+	embedFetchErr    error
+
+	// Ollama LLM model selection
+	llmModelList   []string // filtered: non-embed
+	llmModelCursor int
+	llmFetching    bool
+	llmFetchErr    error
+
+	result   InitResult
+	width    int
+	height   int
+	quitting bool
 }
 
 // NewInitModel creates a new init wizard model.
 func NewInitModel() InitModel {
-	mi := textinput.New()
-	mi.Placeholder = "nomic-embed-text"
-	mi.CharLimit = 100
-	mi.Width = 50
+	eei := textinput.New()
+	eei.Placeholder = "http://localhost:11434"
+	eei.CharLimit = 200
+	eei.Width = 50
 
-	ei := textinput.New()
-	ei.Placeholder = "http://localhost:11434"
-	ei.CharLimit = 200
-	ei.Width = 50
+	lei := textinput.New()
+	lei.Placeholder = "http://localhost:11434"
+	lei.CharLimit = 200
+	lei.Width = 50
 
-	ki := textinput.New()
-	ki.Placeholder = "(optional, press Enter to skip)"
-	ki.CharLimit = 200
-	ki.Width = 50
-	ki.EchoMode = textinput.EchoPassword
-	ki.EchoCharacter = '•'
+	eki := textinput.New()
+	eki.Placeholder = "(optional, press Enter to skip)"
+	eki.CharLimit = 200
+	eki.Width = 50
+	eki.EchoMode = textinput.EchoPassword
+	eki.EchoCharacter = '•'
 
-	li := textinput.New()
-	li.Placeholder = "llama3.2"
-	li.CharLimit = 100
-	li.Width = 50
+	lki := textinput.New()
+	lki.Placeholder = "(optional, press Enter to skip)"
+	lki.CharLimit = 200
+	lki.Width = 50
+	lki.EchoMode = textinput.EchoPassword
+	lki.EchoCharacter = '•'
+
+	emi := textinput.New()
+	emi.Placeholder = "nomic-embed-text"
+	emi.CharLimit = 100
+	emi.Width = 50
+
+	lmi := textinput.New()
+	lmi.Placeholder = "llama3.2"
+	lmi.CharLimit = 100
+	lmi.Width = 50
 
 	return InitModel{
-		step:       stepProvider,
-		providers:  []string{"ollama", "lmstudio", "openai"},
-		provider:   0,
-		modelInput: mi,
-		endpInput:  ei,
-		keyInput:   ki,
-		llmInput:   li,
+		step:            stepProvider,
+		focus:           focusEmbed,
+		providers:       []string{"ollama", "lmstudio", "openai"},
+		embedProvider:   0,
+		llmProvider:     0,
+		embedEndpInput:  eei,
+		llmEndpInput:    lei,
+		embedKeyInput:   eki,
+		llmKeyInput:     lki,
+		embedModelInput: emi,
+		llmModelInput:   lmi,
 	}
 }
 
@@ -159,25 +213,44 @@ func (m InitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 
-	case ollamaModelsMsg:
-		m.fetchingModels = false
+	case ollamaEmbedModelsMsg:
+		m.embedFetching = false
 		if msg.err != nil {
-			m.fetchErr = msg.err
+			m.embedFetchErr = msg.err
 		} else {
-			m.ollamaModels = msg.models
-			m.embedModels = nil
-			m.llmModels = nil
+			m.embedModelList = nil
 			for _, name := range msg.models {
 				if strings.Contains(strings.ToLower(name), "embed") {
-					m.embedModels = append(m.embedModels, name)
-				} else {
-					m.llmModels = append(m.llmModels, name)
+					m.embedModelList = append(m.embedModelList, name)
 				}
 			}
 		}
-		// We're at stepModel now, reset cursor
-		m.embedCursor = 0
-		m.llmCursor = 0
+		m.embedModelCursor = 0
+		// If at embed model step and no list available, focus text input
+		if m.step == stepModel && m.focus == focusEmbed && len(m.embedModelList) == 0 {
+			m.embedModelInput.Focus()
+			return m, textinput.Blink
+		}
+		return m, nil
+
+	case ollamaLLMModelsMsg:
+		m.llmFetching = false
+		if msg.err != nil {
+			m.llmFetchErr = msg.err
+		} else {
+			m.llmModelList = nil
+			for _, name := range msg.models {
+				if !strings.Contains(strings.ToLower(name), "embed") {
+					m.llmModelList = append(m.llmModelList, name)
+				}
+			}
+		}
+		m.llmModelCursor = 0
+		// If at LLM model step and no list available, focus text input
+		if m.step == stepModel && m.focus == focusLLM && len(m.llmModelList) == 0 {
+			m.llmModelInput.Focus()
+			return m, textinput.Blink
+		}
 		return m, nil
 
 	case tea.KeyMsg:
@@ -198,14 +271,12 @@ func (m InitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.step {
 		case stepProvider:
 			return m.updateProvider(msg)
-		case stepModel:
-			return m.updateModel(msg)
 		case stepEndpoint:
 			return m.updateEndpoint(msg)
 		case stepAPIKey:
 			return m.updateAPIKey(msg)
-		case stepLLMModel:
-			return m.updateLLMModel(msg)
+		case stepModel:
+			return m.updateModel(msg)
 		case stepConfirm:
 			return m.updateConfirm(msg)
 		}
@@ -214,196 +285,269 @@ func (m InitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// ---------------------------------------------------------------------------
+// Step update handlers
+// ---------------------------------------------------------------------------
+
 func (m InitModel) updateProvider(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.focus == focusEmbed {
+		switch msg.String() {
+		case "up", "k":
+			if m.embedProvider > 0 {
+				m.embedProvider--
+			}
+		case "down", "j":
+			if m.embedProvider < len(m.providers)-1 {
+				m.embedProvider++
+			}
+		case "enter":
+			m.result.Provider = m.providers[m.embedProvider]
+			// Pre-select LLM provider to match embedding
+			m.llmProvider = m.embedProvider
+			m.focus = focusLLM
+		}
+		return m, nil
+	}
+
+	// focusLLM
 	switch msg.String() {
 	case "up", "k":
-		if m.provider > 0 {
-			m.provider--
+		if m.llmProvider > 0 {
+			m.llmProvider--
 		}
 	case "down", "j":
-		if m.provider < len(m.providers)-1 {
-			m.provider++
+		if m.llmProvider < len(m.providers)-1 {
+			m.llmProvider++
 		}
 	case "enter":
-		m.result.Provider = m.providers[m.provider]
+		m.result.LLMProvider = m.providers[m.llmProvider]
+		// Load provider-specific defaults
 		embedDefaults := config.DefaultEmbedderForProvider(m.result.Provider)
-		m.modelInput.SetValue(embedDefaults.Model)
-		m.modelInput.Placeholder = embedDefaults.Model
-		m.endpInput.SetValue(embedDefaults.Endpoint)
-		m.endpInput.Placeholder = embedDefaults.Endpoint
-		llmDefaults := config.DefaultLLMForProvider(m.result.Provider)
-		m.llmInput.SetValue(llmDefaults.Model)
-		m.llmInput.Placeholder = llmDefaults.Model
+		llmDefaults := config.DefaultLLMForProvider(m.result.LLMProvider)
+		m.embedEndpInput.SetValue(embedDefaults.Endpoint)
+		m.embedEndpInput.Placeholder = embedDefaults.Endpoint
+		m.llmEndpInput.Placeholder = llmDefaults.Endpoint
+		m.embedModelInput.SetValue(embedDefaults.Model)
+		m.embedModelInput.Placeholder = embedDefaults.Model
+		m.llmModelInput.SetValue(llmDefaults.Model)
+		m.llmModelInput.Placeholder = llmDefaults.Model
+		// Transition to endpoint step
 		m.step = stepEndpoint
-		m.endpInput.Focus()
-		return m, textinput.Blink
-	}
-	return m, nil
-}
-
-func (m InitModel) updateModel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// If we have Ollama embed models, use list selection
-	if len(m.embedModels) > 0 {
-		return m.updateModelList(msg)
-	}
-	// Fallback: text input
-	switch msg.String() {
-	case "enter":
-		val := m.modelInput.Value()
-		if val == "" {
-			val = m.modelInput.Placeholder
-		}
-		m.result.Model = val
-		m.modelInput.Blur()
-		m.step = stepLLMModel
-		if len(m.llmModels) > 0 {
-			return m, nil
-		}
-		m.llmInput.Focus()
-		return m, textinput.Blink
-	}
-	var cmd tea.Cmd
-	m.modelInput, cmd = m.modelInput.Update(msg)
-	return m, cmd
-}
-
-func (m InitModel) updateModelList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// embedModels + "Type custom name..." option
-	total := len(m.embedModels) + 1
-	switch msg.String() {
-	case "up", "k":
-		if m.embedCursor > 0 {
-			m.embedCursor--
-		}
-	case "down", "j":
-		if m.embedCursor < total-1 {
-			m.embedCursor++
-		}
-	case "enter":
-		if m.embedCursor < len(m.embedModels) {
-			m.result.Model = m.embedModels[m.embedCursor]
-		} else {
-			// "Custom" selected — switch to text input
-			m.embedModels = nil // clear to fall back to text input
-			m.modelInput.Focus()
-			return m, textinput.Blink
-		}
-		m.step = stepLLMModel
-		if len(m.llmModels) > 0 {
-			return m, nil
-		}
-		m.llmInput.Focus()
+		m.focus = focusEmbed
+		m.embedEndpInput.Focus()
 		return m, textinput.Blink
 	}
 	return m, nil
 }
 
 func (m InitModel) updateEndpoint(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "enter":
-		val := m.endpInput.Value()
-		if val == "" {
-			val = m.endpInput.Placeholder
-		}
-		m.result.Endpoint = val
-		m.endpInput.Blur()
-
-		if m.result.Provider == "openai" {
-			m.step = stepAPIKey
-			m.keyInput.Focus()
+	if m.focus == focusEmbed {
+		switch msg.String() {
+		case "enter":
+			val := m.embedEndpInput.Value()
+			if val == "" {
+				val = m.embedEndpInput.Placeholder
+			}
+			m.result.Endpoint = val
+			m.embedEndpInput.Blur()
+			// Pre-fill LLM endpoint with the embedding endpoint
+			m.llmEndpInput.SetValue(val)
+			m.focus = focusLLM
+			m.llmEndpInput.Focus()
 			return m, textinput.Blink
 		}
-		// For Ollama/LMStudio: fetch models and go to embed model step
-		m.step = stepModel
-		if m.result.Provider == "ollama" {
-			m.fetchingModels = true
-			m.fetchErr = nil
-			m.ollamaModels = nil
-			return m, fetchOllamaModels(val)
+		var cmd tea.Cmd
+		m.embedEndpInput, cmd = m.embedEndpInput.Update(msg)
+		return m, cmd
+	}
+
+	// focusLLM
+	switch msg.String() {
+	case "enter":
+		val := m.llmEndpInput.Value()
+		if val == "" {
+			val = m.llmEndpInput.Placeholder
 		}
-		m.modelInput.Focus()
+		m.result.LLMEndpoint = val
+		m.llmEndpInput.Blur()
+		m.step = stepAPIKey
+		m.focus = focusEmbed
+		m.embedKeyInput.Focus()
 		return m, textinput.Blink
 	}
 	var cmd tea.Cmd
-	m.endpInput, cmd = m.endpInput.Update(msg)
+	m.llmEndpInput, cmd = m.llmEndpInput.Update(msg)
 	return m, cmd
 }
 
 func (m InitModel) updateAPIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "enter":
-		m.result.APIKey = m.keyInput.Value()
-		m.keyInput.Blur()
-		m.step = stepModel
-		m.modelInput.Focus()
-		return m, textinput.Blink
-	}
-	var cmd tea.Cmd
-	m.keyInput, cmd = m.keyInput.Update(msg)
-	return m, cmd
-}
-
-func (m InitModel) updateLLMModel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// If we have Ollama LLM models, use list selection
-	if len(m.llmModels) > 0 {
-		return m.updateLLMModelList(msg)
-	}
-	// Fallback: text input
-	switch msg.String() {
-	case "enter":
-		val := m.llmInput.Value()
-		if val == "" {
-			val = m.llmInput.Placeholder
-		}
-		m.result.LLMModel = val
-		m.result.LLMEndpoint = m.resolveLLMEndpoint()
-		m.llmInput.Blur()
-		m.step = stepConfirm
-		return m, nil
-	}
-	var cmd tea.Cmd
-	m.llmInput, cmd = m.llmInput.Update(msg)
-	return m, cmd
-}
-
-func (m InitModel) updateLLMModelList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// llmModels + "Type custom name..." option
-	total := len(m.llmModels) + 1
-	switch msg.String() {
-	case "up", "k":
-		if m.llmCursor > 0 {
-			m.llmCursor--
-		}
-	case "down", "j":
-		if m.llmCursor < total-1 {
-			m.llmCursor++
-		}
-	case "enter":
-		if m.llmCursor < len(m.llmModels) {
-			m.result.LLMModel = m.llmModels[m.llmCursor]
-		} else {
-			// "Custom" selected — switch to text input
-			m.llmModels = nil // clear to fall back to text input
-			m.llmInput.Focus()
+	if m.focus == focusEmbed {
+		switch msg.String() {
+		case "enter":
+			m.result.APIKey = m.embedKeyInput.Value()
+			m.embedKeyInput.Blur()
+			// Pre-fill LLM API key with embedding key
+			if m.result.APIKey != "" {
+				m.llmKeyInput.SetValue(m.result.APIKey)
+			}
+			m.focus = focusLLM
+			m.llmKeyInput.Focus()
 			return m, textinput.Blink
 		}
-		m.result.LLMEndpoint = m.resolveLLMEndpoint()
-		m.step = stepConfirm
+		var cmd tea.Cmd
+		m.embedKeyInput, cmd = m.embedKeyInput.Update(msg)
+		return m, cmd
+	}
+
+	// focusLLM
+	switch msg.String() {
+	case "enter":
+		m.result.LLMAPIKey = m.llmKeyInput.Value()
+		m.llmKeyInput.Blur()
+		// Transition to model step — trigger Ollama fetches if needed
+		m.step = stepModel
+		m.focus = focusEmbed
+		var cmds []tea.Cmd
+		if m.result.Provider == "ollama" {
+			m.embedFetching = true
+			m.embedFetchErr = nil
+			cmds = append(cmds, fetchOllamaEmbedModels(m.result.Endpoint))
+		} else {
+			m.embedModelInput.Focus()
+			cmds = append(cmds, textinput.Blink)
+		}
+		if m.result.LLMProvider == "ollama" {
+			m.llmFetching = true
+			m.llmFetchErr = nil
+			cmds = append(cmds, fetchOllamaLLMModels(m.result.LLMEndpoint))
+		}
+		if len(cmds) > 0 {
+			return m, tea.Batch(cmds...)
+		}
 		return m, nil
+	}
+	var cmd tea.Cmd
+	m.llmKeyInput, cmd = m.llmKeyInput.Update(msg)
+	return m, cmd
+}
+
+func (m InitModel) updateModel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.focus == focusEmbed {
+		return m.updateEmbedModel(msg)
+	}
+	return m.updateLLMModel(msg)
+}
+
+func (m InitModel) updateEmbedModel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Still fetching from Ollama — ignore input
+	if m.result.Provider == "ollama" && m.embedFetching {
+		return m, nil
+	}
+	// Ollama list selection
+	if m.result.Provider == "ollama" && len(m.embedModelList) > 0 {
+		return m.updateEmbedModelList(msg)
+	}
+	// Text input fallback
+	switch msg.String() {
+	case "enter":
+		val := m.embedModelInput.Value()
+		if val == "" {
+			val = m.embedModelInput.Placeholder
+		}
+		m.result.Model = val
+		m.embedModelInput.Blur()
+		return m.transitionToLLMModel()
+	}
+	var cmd tea.Cmd
+	m.embedModelInput, cmd = m.embedModelInput.Update(msg)
+	return m, cmd
+}
+
+func (m InitModel) updateEmbedModelList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	total := len(m.embedModelList) + 1 // +1 for "Custom"
+	switch msg.String() {
+	case "up", "k":
+		if m.embedModelCursor > 0 {
+			m.embedModelCursor--
+		}
+	case "down", "j":
+		if m.embedModelCursor < total-1 {
+			m.embedModelCursor++
+		}
+	case "enter":
+		if m.embedModelCursor < len(m.embedModelList) {
+			m.result.Model = m.embedModelList[m.embedModelCursor]
+		} else {
+			// "Custom" selected — switch to text input
+			m.embedModelList = nil
+			m.embedModelInput.Focus()
+			return m, textinput.Blink
+		}
+		return m.transitionToLLMModel()
 	}
 	return m, nil
 }
 
-// resolveLLMEndpoint returns the user-provided endpoint for the LLM.
-// Falls back to the provider default only when the user's endpoint matches
-// the embedder default (i.e. the user didn't supply a custom one).
-func (m InitModel) resolveLLMEndpoint() string {
-	embedDefaults := config.DefaultEmbedderForProvider(m.result.Provider)
-	if m.result.Endpoint != "" && m.result.Endpoint != embedDefaults.Endpoint {
-		return m.result.Endpoint
+func (m InitModel) transitionToLLMModel() (tea.Model, tea.Cmd) {
+	m.focus = focusLLM
+	// If Ollama LLM models are available or still fetching, use list
+	if m.result.LLMProvider == "ollama" && (m.llmFetching || len(m.llmModelList) > 0) {
+		return m, nil
 	}
-	llmDefaults := config.DefaultLLMForProvider(m.result.Provider)
-	return llmDefaults.Endpoint
+	m.llmModelInput.Focus()
+	return m, textinput.Blink
+}
+
+func (m InitModel) updateLLMModel(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Still fetching from Ollama — ignore input
+	if m.result.LLMProvider == "ollama" && m.llmFetching {
+		return m, nil
+	}
+	// Ollama list selection
+	if m.result.LLMProvider == "ollama" && len(m.llmModelList) > 0 {
+		return m.updateLLMModelList(msg)
+	}
+	// Text input fallback
+	switch msg.String() {
+	case "enter":
+		val := m.llmModelInput.Value()
+		if val == "" {
+			val = m.llmModelInput.Placeholder
+		}
+		m.result.LLMModel = val
+		m.llmModelInput.Blur()
+		m.step = stepConfirm
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.llmModelInput, cmd = m.llmModelInput.Update(msg)
+	return m, cmd
+}
+
+func (m InitModel) updateLLMModelList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	total := len(m.llmModelList) + 1
+	switch msg.String() {
+	case "up", "k":
+		if m.llmModelCursor > 0 {
+			m.llmModelCursor--
+		}
+	case "down", "j":
+		if m.llmModelCursor < total-1 {
+			m.llmModelCursor++
+		}
+	case "enter":
+		if m.llmModelCursor < len(m.llmModelList) {
+			m.result.LLMModel = m.llmModelList[m.llmModelCursor]
+		} else {
+			// "Custom" selected — switch to text input
+			m.llmModelList = nil
+			m.llmModelInput.Focus()
+			return m, textinput.Blink
+		}
+		m.step = stepConfirm
+		return m, nil
+	}
+	return m, nil
 }
 
 func (m InitModel) updateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -418,10 +562,15 @@ func (m InitModel) updateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "b":
 		m.step = stepProvider
+		m.focus = focusEmbed
 		return m, nil
 	}
 	return m, nil
 }
+
+// ---------------------------------------------------------------------------
+// View
+// ---------------------------------------------------------------------------
 
 func (m InitModel) View() string {
 	if m.quitting {
@@ -438,7 +587,7 @@ func (m InitModel) View() string {
 	b.WriteString(TaglineStyle.Render("  AI-native codebase intelligence") + "\n\n")
 
 	// Progress indicator
-	steps := []string{"Provider", "Endpoint", "API Key", "Embed Model", "LLM Model", "Confirm"}
+	steps := []string{"Provider", "Endpoint", "API Key", "Model", "Confirm"}
 	b.WriteString(m.renderProgress(steps) + "\n\n")
 
 	switch m.step {
@@ -450,8 +599,6 @@ func (m InitModel) View() string {
 		b.WriteString(m.renderAPIKeyStep())
 	case stepModel:
 		b.WriteString(m.renderModelStep())
-	case stepLLMModel:
-		b.WriteString(m.renderLLMModelStep())
 	case stepConfirm:
 		b.WriteString(m.renderConfirmStep())
 	}
@@ -476,9 +623,12 @@ func (m InitModel) renderProgress(steps []string) string {
 	return strings.Join(parts, DimStyle.Render(" "+SymbolArrow+" "))
 }
 
+// ---------------------------------------------------------------------------
+// Render helpers
+// ---------------------------------------------------------------------------
+
 func (m InitModel) renderProviderStep() string {
 	var b strings.Builder
-	b.WriteString(TitleStyle.Render("Choose your embedding provider") + "\n\n")
 
 	descriptions := map[string]string{
 		"ollama":   "Local inference, free, runs on your machine (recommended)",
@@ -486,16 +636,77 @@ func (m InitModel) renderProviderStep() string {
 		"openai":   "OpenAI API or any OpenAI-compatible endpoint",
 	}
 
-	for i, p := range m.providers {
-		cursor := "  "
-		style := ItemStyle
-		if i == m.provider {
-			cursor = FocusedStyle.Render(SymbolArrow + " ")
-			style = ActiveItemStyle
+	if m.focus == focusEmbed {
+		b.WriteString(TitleStyle.Render("Embedding Provider") + "\n\n")
+		for i, p := range m.providers {
+			cursor := "  "
+			style := ItemStyle
+			if i == m.embedProvider {
+				cursor = FocusedStyle.Render(SymbolArrow + " ")
+				style = ActiveItemStyle
+			}
+			name := style.Render(p)
+			desc := MutedStyle.Render(" " + SymbolDot + " " + descriptions[p])
+			b.WriteString(fmt.Sprintf("%s%s%s\n", cursor, name, desc))
 		}
-		name := style.Render(p)
-		desc := MutedStyle.Render(" " + SymbolDot + " " + descriptions[p])
-		b.WriteString(fmt.Sprintf("%s%s%s\n", cursor, name, desc))
+		b.WriteString("\n" + DimStyle.Render("LLM Provider") + "\n")
+		b.WriteString(DimStyle.Render("  (select embedding provider first)") + "\n")
+	} else {
+		b.WriteString(SuccessStyle.Render(fmt.Sprintf("%s Embedding Provider: %s", SymbolCheck, m.result.Provider)) + "\n\n")
+		b.WriteString(TitleStyle.Render("LLM Provider") + "\n\n")
+		for i, p := range m.providers {
+			cursor := "  "
+			style := ItemStyle
+			if i == m.llmProvider {
+				cursor = FocusedStyle.Render(SymbolArrow + " ")
+				style = ActiveItemStyle
+			}
+			name := style.Render(p)
+			desc := MutedStyle.Render(" " + SymbolDot + " " + descriptions[p])
+			b.WriteString(fmt.Sprintf("%s%s%s\n", cursor, name, desc))
+		}
+	}
+
+	return b.String()
+}
+
+func (m InitModel) renderEndpointStep() string {
+	var b strings.Builder
+
+	if m.focus == focusEmbed {
+		b.WriteString(TitleStyle.Render("Embedding API Endpoint") + "\n")
+		b.WriteString(MutedStyle.Render(fmt.Sprintf("Provider: %s", m.result.Provider)) + "\n\n")
+		b.WriteString(m.embedEndpInput.View() + "\n")
+		b.WriteString("\n" + DimStyle.Render("LLM Endpoint") + "\n")
+		b.WriteString(DimStyle.Render("  (will be pre-filled with embedding endpoint)") + "\n")
+	} else {
+		b.WriteString(SuccessStyle.Render(fmt.Sprintf("%s Embedding Endpoint: %s", SymbolCheck, m.result.Endpoint)) + "\n\n")
+		b.WriteString(TitleStyle.Render("LLM API Endpoint") + "\n")
+		b.WriteString(MutedStyle.Render(fmt.Sprintf("Provider: %s | Pre-filled with embedding endpoint — change if needed", m.result.LLMProvider)) + "\n\n")
+		b.WriteString(m.llmEndpInput.View() + "\n")
+	}
+
+	return b.String()
+}
+
+func (m InitModel) renderAPIKeyStep() string {
+	var b strings.Builder
+
+	if m.focus == focusEmbed {
+		b.WriteString(TitleStyle.Render("Embedding API Key") + "\n")
+		b.WriteString(MutedStyle.Render("Optional. Required for OpenAI, skip for local providers.") + "\n\n")
+		b.WriteString(m.embedKeyInput.View() + "\n")
+		b.WriteString("\n" + DimStyle.Render("LLM API Key") + "\n")
+		b.WriteString(DimStyle.Render("  (will be pre-filled with embedding key)") + "\n")
+	} else {
+		if m.result.APIKey != "" {
+			b.WriteString(SuccessStyle.Render(fmt.Sprintf("%s Embedding API Key: ••••••••", SymbolCheck)) + "\n\n")
+		} else {
+			b.WriteString(SuccessStyle.Render(fmt.Sprintf("%s Embedding API Key: (none)", SymbolCheck)) + "\n\n")
+		}
+		b.WriteString(TitleStyle.Render("LLM API Key") + "\n")
+		b.WriteString(MutedStyle.Render("Optional. Pre-filled with embedding key if set.") + "\n\n")
+		b.WriteString(m.llmKeyInput.View() + "\n")
 	}
 
 	return b.String()
@@ -503,29 +714,45 @@ func (m InitModel) renderProviderStep() string {
 
 func (m InitModel) renderModelStep() string {
 	var b strings.Builder
-	b.WriteString(TitleStyle.Render("Embedding model") + "\n")
-	b.WriteString(MutedStyle.Render(fmt.Sprintf("Provider: %s | Endpoint: %s", m.result.Provider, m.result.Endpoint)) + "\n\n")
 
-	if m.fetchingModels {
+	if m.focus == focusEmbed {
+		b.WriteString(TitleStyle.Render("Embedding Model") + "\n")
+		b.WriteString(MutedStyle.Render(fmt.Sprintf("Provider: %s | Endpoint: %s", m.result.Provider, m.result.Endpoint)) + "\n\n")
+		b.WriteString(m.renderEmbedModelSelector())
+		b.WriteString("\n" + DimStyle.Render("LLM Model") + "\n")
+		b.WriteString(DimStyle.Render("  (select embedding model first)") + "\n")
+	} else {
+		b.WriteString(SuccessStyle.Render(fmt.Sprintf("%s Embedding Model: %s", SymbolCheck, m.result.Model)) + "\n\n")
+		b.WriteString(TitleStyle.Render("LLM Model") + "\n")
+		b.WriteString(MutedStyle.Render(fmt.Sprintf("Provider: %s | Endpoint: %s", m.result.LLMProvider, m.result.LLMEndpoint)) + "\n\n")
+		b.WriteString(m.renderLLMModelSelector())
+	}
+
+	return b.String()
+}
+
+func (m InitModel) renderEmbedModelSelector() string {
+	var b strings.Builder
+
+	if m.result.Provider == "ollama" && m.embedFetching {
 		b.WriteString(MutedStyle.Render("  Fetching models from Ollama...") + "\n")
 		return b.String()
 	}
 
-	if len(m.embedModels) > 0 {
+	if m.result.Provider == "ollama" && len(m.embedModelList) > 0 {
 		b.WriteString(MutedStyle.Render("  Select an embedding model:") + "\n\n")
-		for i, name := range m.embedModels {
+		for i, name := range m.embedModelList {
 			cursor := "  "
 			style := ItemStyle
-			if i == m.embedCursor {
+			if i == m.embedModelCursor {
 				cursor = FocusedStyle.Render(SymbolArrow + " ")
 				style = ActiveItemStyle
 			}
 			b.WriteString(fmt.Sprintf("%s%s\n", cursor, style.Render(name)))
 		}
-		// "Custom" option
 		cursor := "  "
 		style := ItemStyle
-		if m.embedCursor == len(m.embedModels) {
+		if m.embedModelCursor == len(m.embedModelList) {
 			cursor = FocusedStyle.Render(SymbolArrow + " ")
 			style = ActiveItemStyle
 		}
@@ -533,51 +760,37 @@ func (m InitModel) renderModelStep() string {
 		return b.String()
 	}
 
-	if m.fetchErr != nil {
-		b.WriteString(WarningStyle.Render(fmt.Sprintf("  Could not fetch models: %v", m.fetchErr)) + "\n")
+	if m.result.Provider == "ollama" && m.embedFetchErr != nil {
+		b.WriteString(WarningStyle.Render(fmt.Sprintf("  Could not fetch models: %v", m.embedFetchErr)) + "\n")
 		b.WriteString(MutedStyle.Render("  Type model name manually:") + "\n\n")
 	}
 
-	b.WriteString(m.modelInput.View() + "\n")
+	b.WriteString(m.embedModelInput.View() + "\n")
 	return b.String()
 }
 
-func (m InitModel) renderEndpointStep() string {
+func (m InitModel) renderLLMModelSelector() string {
 	var b strings.Builder
-	b.WriteString(TitleStyle.Render("API endpoint URL") + "\n")
-	b.WriteString(MutedStyle.Render(fmt.Sprintf("Provider: %s", m.result.Provider)) + "\n\n")
-	b.WriteString(m.endpInput.View() + "\n")
-	return b.String()
-}
 
-func (m InitModel) renderAPIKeyStep() string {
-	var b strings.Builder
-	b.WriteString(TitleStyle.Render("API Key") + "\n")
-	b.WriteString(MutedStyle.Render("Required for OpenAI, optional for compatible APIs") + "\n\n")
-	b.WriteString(m.keyInput.View() + "\n")
-	return b.String()
-}
+	if m.result.LLMProvider == "ollama" && m.llmFetching {
+		b.WriteString(MutedStyle.Render("  Fetching models from Ollama...") + "\n")
+		return b.String()
+	}
 
-func (m InitModel) renderLLMModelStep() string {
-	var b strings.Builder
-	b.WriteString(TitleStyle.Render("LLM model for chat / ask") + "\n")
-	b.WriteString(MutedStyle.Render(fmt.Sprintf("Provider: %s (used for 'saras ask' and AGENTS.md generation)", m.result.Provider)) + "\n\n")
-
-	if len(m.llmModels) > 0 {
+	if m.result.LLMProvider == "ollama" && len(m.llmModelList) > 0 {
 		b.WriteString(MutedStyle.Render("  Select a chat/LLM model:") + "\n\n")
-		for i, name := range m.llmModels {
+		for i, name := range m.llmModelList {
 			cursor := "  "
 			style := ItemStyle
-			if i == m.llmCursor {
+			if i == m.llmModelCursor {
 				cursor = FocusedStyle.Render(SymbolArrow + " ")
 				style = ActiveItemStyle
 			}
 			b.WriteString(fmt.Sprintf("%s%s\n", cursor, style.Render(name)))
 		}
-		// "Custom" option
 		cursor := "  "
 		style := ItemStyle
-		if m.llmCursor == len(m.llmModels) {
+		if m.llmModelCursor == len(m.llmModelList) {
 			cursor = FocusedStyle.Render(SymbolArrow + " ")
 			style = ActiveItemStyle
 		}
@@ -585,7 +798,12 @@ func (m InitModel) renderLLMModelStep() string {
 		return b.String()
 	}
 
-	b.WriteString(m.llmInput.View() + "\n")
+	if m.result.LLMProvider == "ollama" && m.llmFetchErr != nil {
+		b.WriteString(WarningStyle.Render(fmt.Sprintf("  Could not fetch models: %v", m.llmFetchErr)) + "\n")
+		b.WriteString(MutedStyle.Render("  Type model name manually:") + "\n\n")
+	}
+
+	b.WriteString(m.llmModelInput.View() + "\n")
 	return b.String()
 }
 
@@ -593,13 +811,22 @@ func (m InitModel) renderConfirmStep() string {
 	var b strings.Builder
 	b.WriteString(TitleStyle.Render("Review configuration") + "\n\n")
 
-	labelStyle := lipgloss.NewStyle().Foreground(ColorSecondary).Width(16)
+	labelStyle := lipgloss.NewStyle().Foreground(ColorSecondary).Width(18)
 
+	b.WriteString(MutedStyle.Render("  Embedding") + "\n")
 	b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("Provider:"), m.result.Provider))
-	b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("Embed Model:"), m.result.Model))
-	b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("LLM Model:"), m.result.LLMModel))
+	b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("Model:"), m.result.Model))
 	b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("Endpoint:"), m.result.Endpoint))
 	if m.result.APIKey != "" {
+		b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("API Key:"), "••••••••"))
+	}
+
+	b.WriteString("\n")
+	b.WriteString(MutedStyle.Render("  LLM") + "\n")
+	b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("Provider:"), m.result.LLMProvider))
+	b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("Model:"), m.result.LLMModel))
+	b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("Endpoint:"), m.result.LLMEndpoint))
+	if m.result.LLMAPIKey != "" {
 		b.WriteString(fmt.Sprintf("  %s %s\n", labelStyle.Render("API Key:"), "••••••••"))
 	}
 
@@ -617,15 +844,9 @@ func (m InitModel) renderHelp() string {
 			HelpKeyStyle.Render("enter") + HelpDescStyle.Render(" confirm  ") +
 			HelpKeyStyle.Render("esc") + HelpDescStyle.Render(" quit")
 	case stepModel:
-		if len(m.embedModels) > 0 {
-			return HelpKeyStyle.Render("↑↓") + HelpDescStyle.Render(" select  ") +
-				HelpKeyStyle.Render("enter") + HelpDescStyle.Render(" confirm  ") +
-				HelpKeyStyle.Render("esc") + HelpDescStyle.Render(" quit")
-		}
-		return HelpKeyStyle.Render("enter") + HelpDescStyle.Render(" next  ") +
-			HelpKeyStyle.Render("esc") + HelpDescStyle.Render(" quit")
-	case stepLLMModel:
-		if len(m.llmModels) > 0 {
+		showList := (m.focus == focusEmbed && m.result.Provider == "ollama" && len(m.embedModelList) > 0) ||
+			(m.focus == focusLLM && m.result.LLMProvider == "ollama" && len(m.llmModelList) > 0)
+		if showList {
 			return HelpKeyStyle.Render("↑↓") + HelpDescStyle.Render(" select  ") +
 				HelpKeyStyle.Render("enter") + HelpDescStyle.Render(" confirm  ") +
 				HelpKeyStyle.Render("esc") + HelpDescStyle.Render(" quit")

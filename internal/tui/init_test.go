@@ -23,8 +23,11 @@ func TestNewInitModel(t *testing.T) {
 	if m.step != stepProvider {
 		t.Errorf("expected initial step to be stepProvider")
 	}
-	if m.provider != 0 {
-		t.Errorf("expected initial provider index 0, got %d", m.provider)
+	if m.focus != focusEmbed {
+		t.Errorf("expected initial focus to be focusEmbed")
+	}
+	if m.embedProvider != 0 {
+		t.Errorf("expected initial embedProvider index 0, got %d", m.embedProvider)
 	}
 }
 
@@ -34,29 +37,29 @@ func TestInitModelProviderNavigation(t *testing.T) {
 	// Down arrow moves selection
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = updated.(InitModel)
-	if m.provider != 1 {
-		t.Errorf("expected provider 1 after down, got %d", m.provider)
+	if m.embedProvider != 1 {
+		t.Errorf("expected embedProvider 1 after down, got %d", m.embedProvider)
 	}
 
 	// Down again
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = updated.(InitModel)
-	if m.provider != 2 {
-		t.Errorf("expected provider 2 after second down, got %d", m.provider)
+	if m.embedProvider != 2 {
+		t.Errorf("expected embedProvider 2 after second down, got %d", m.embedProvider)
 	}
 
 	// Down at bottom should stay
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = updated.(InitModel)
-	if m.provider != 2 {
-		t.Errorf("expected provider to stay at 2, got %d", m.provider)
+	if m.embedProvider != 2 {
+		t.Errorf("expected embedProvider to stay at 2, got %d", m.embedProvider)
 	}
 
 	// Up arrow
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
 	m = updated.(InitModel)
-	if m.provider != 1 {
-		t.Errorf("expected provider 1 after up, got %d", m.provider)
+	if m.embedProvider != 1 {
+		t.Errorf("expected embedProvider 1 after up, got %d", m.embedProvider)
 	}
 
 	// Up at top should stay
@@ -64,44 +67,66 @@ func TestInitModelProviderNavigation(t *testing.T) {
 	m = updated.(InitModel)
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
 	m = updated.(InitModel)
-	if m.provider != 0 {
-		t.Errorf("expected provider to stay at 0, got %d", m.provider)
+	if m.embedProvider != 0 {
+		t.Errorf("expected embedProvider to stay at 0, got %d", m.embedProvider)
 	}
 }
 
 func TestInitModelProviderSelectionOllama(t *testing.T) {
 	m := NewInitModel()
 
-	// Select ollama (index 0) with enter
+	// Select embed provider (ollama at index 0) — moves to LLM focus
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(InitModel)
+
+	if m.step != stepProvider {
+		t.Errorf("expected step to stay at stepProvider for LLM selection, got %d", m.step)
+	}
+	if m.focus != focusLLM {
+		t.Errorf("expected focus to be focusLLM after embed provider selected")
+	}
+	if m.result.Provider != "ollama" {
+		t.Errorf("expected embed provider ollama, got %s", m.result.Provider)
+	}
+
+	// Select LLM provider (pre-selected to ollama) — moves to endpoint step
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(InitModel)
 
 	if m.step != stepEndpoint {
 		t.Errorf("expected step to advance to stepEndpoint, got %d", m.step)
 	}
-	if m.result.Provider != "ollama" {
-		t.Errorf("expected provider ollama, got %s", m.result.Provider)
+	if m.focus != focusEmbed {
+		t.Errorf("expected focus to reset to focusEmbed")
+	}
+	if m.result.LLMProvider != "ollama" {
+		t.Errorf("expected LLM provider ollama, got %s", m.result.LLMProvider)
 	}
 }
 
 func TestInitModelProviderSelectionLMStudio(t *testing.T) {
 	m := NewInitModel()
 
-	// Navigate to lmstudio (index 1)
+	// Navigate to lmstudio (index 1) and select as embed provider
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = updated.(InitModel)
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(InitModel)
 
 	if m.result.Provider != "lmstudio" {
-		t.Errorf("expected provider lmstudio, got %s", m.result.Provider)
+		t.Errorf("expected embed provider lmstudio, got %s", m.result.Provider)
+	}
+
+	// LLM provider should be pre-selected to lmstudio too
+	if m.llmProvider != 1 {
+		t.Errorf("expected llmProvider pre-selected to 1, got %d", m.llmProvider)
 	}
 }
 
 func TestInitModelProviderSelectionOpenAI(t *testing.T) {
 	m := NewInitModel()
 
-	// Navigate to openai (index 2)
+	// Navigate to openai (index 2) and select as embed provider
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = updated.(InitModel)
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
@@ -110,7 +135,30 @@ func TestInitModelProviderSelectionOpenAI(t *testing.T) {
 	m = updated.(InitModel)
 
 	if m.result.Provider != "openai" {
-		t.Errorf("expected provider openai, got %s", m.result.Provider)
+		t.Errorf("expected embed provider openai, got %s", m.result.Provider)
+	}
+}
+
+func TestInitModelDifferentLLMProvider(t *testing.T) {
+	m := NewInitModel()
+
+	// Select ollama as embed provider
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(InitModel)
+
+	// Navigate to openai for LLM
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(InitModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(InitModel)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(InitModel)
+
+	if m.result.Provider != "ollama" {
+		t.Errorf("expected embed provider ollama, got %s", m.result.Provider)
+	}
+	if m.result.LLMProvider != "openai" {
+		t.Errorf("expected LLM provider openai, got %s", m.result.LLMProvider)
 	}
 }
 
@@ -161,8 +209,8 @@ func TestInitModelViewProviderStep(t *testing.T) {
 	if !strings.Contains(view, "openai") {
 		t.Error("expected openai in provider view")
 	}
-	if !strings.Contains(view, "Choose your embedding provider") {
-		t.Error("expected provider selection title")
+	if !strings.Contains(view, "Embedding Provider") {
+		t.Error("expected embedding provider title")
 	}
 }
 
@@ -173,17 +221,20 @@ func TestInitModelViewConfirmStep(t *testing.T) {
 	m.result.Provider = "ollama"
 	m.result.Model = "nomic-embed-text"
 	m.result.Endpoint = "http://localhost:11434"
+	m.result.LLMProvider = "ollama"
+	m.result.LLMModel = "llama3.2"
+	m.result.LLMEndpoint = "http://localhost:11434"
 	m.step = stepConfirm
 
 	view := m.View()
 	if !strings.Contains(view, "Review configuration") {
 		t.Error("expected review title")
 	}
-	if !strings.Contains(view, "ollama") {
-		t.Error("expected provider in confirm view")
-	}
 	if !strings.Contains(view, "nomic-embed-text") {
-		t.Error("expected model in confirm view")
+		t.Error("expected embed model in confirm view")
+	}
+	if !strings.Contains(view, "llama3.2") {
+		t.Error("expected LLM model in confirm view")
 	}
 }
 
@@ -233,6 +284,9 @@ func TestInitModelConfirmBack(t *testing.T) {
 	if m.step != stepProvider {
 		t.Errorf("expected step to go back to provider, got %d", m.step)
 	}
+	if m.focus != focusEmbed {
+		t.Errorf("expected focus to reset to focusEmbed")
+	}
 }
 
 func TestInitModelQuitView(t *testing.T) {
@@ -277,25 +331,26 @@ func TestInitModelVimNavigation(t *testing.T) {
 	// 'j' should move down
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	m = updated.(InitModel)
-	if m.provider != 1 {
-		t.Errorf("expected provider 1 after 'j', got %d", m.provider)
+	if m.embedProvider != 1 {
+		t.Errorf("expected embedProvider 1 after 'j', got %d", m.embedProvider)
 	}
 
 	// 'k' should move up
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
 	m = updated.(InitModel)
-	if m.provider != 0 {
-		t.Errorf("expected provider 0 after 'k', got %d", m.provider)
+	if m.embedProvider != 0 {
+		t.Errorf("expected embedProvider 0 after 'k', got %d", m.embedProvider)
 	}
 }
 
 func TestInitModelGetResult(t *testing.T) {
 	m := NewInitModel()
 	m.result = InitResult{
-		Provider: "ollama",
-		Model:    "test-model",
-		Endpoint: "http://test:1234",
-		Done:     true,
+		Provider:    "ollama",
+		Model:       "test-model",
+		Endpoint:    "http://test:1234",
+		LLMProvider: "ollama",
+		Done:        true,
 	}
 
 	r := m.GetResult()
@@ -318,145 +373,187 @@ func TestInitModelInit(t *testing.T) {
 	}
 }
 
-func TestInitModelOpenAIShowsAPIKeyStep(t *testing.T) {
+func TestInitModelEndpointPrefillsLLM(t *testing.T) {
 	m := NewInitModel()
-
-	// Select openai
-	m.result.Provider = "openai"
-	m.result.Model = "text-embedding-3-small"
-	m.result.Endpoint = "https://api.openai.com/v1"
+	m.result.Provider = "ollama"
+	m.result.LLMProvider = "ollama"
 	m.step = stepEndpoint
+	m.focus = focusEmbed
+	m.embedEndpInput.SetValue("http://custom:9999")
+	m.embedEndpInput.Focus()
 
-	// Press enter to advance from endpoint - should go to API key step for openai
+	// Enter on embed endpoint — should pre-fill LLM endpoint
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(InitModel)
 
-	if m.step != stepAPIKey {
-		t.Errorf("expected API key step for openai, got step %d", m.step)
+	if m.focus != focusLLM {
+		t.Errorf("expected focus to move to focusLLM")
+	}
+	if m.result.Endpoint != "http://custom:9999" {
+		t.Errorf("expected embed endpoint http://custom:9999, got %s", m.result.Endpoint)
+	}
+	if m.llmEndpInput.Value() != "http://custom:9999" {
+		t.Errorf("expected LLM endpoint pre-filled with embed endpoint, got %s", m.llmEndpInput.Value())
 	}
 }
 
-func TestInitModelNonOpenAISkipsAPIKeyStep(t *testing.T) {
+func TestInitModelAPIKeyPrefillsLLM(t *testing.T) {
+	m := NewInitModel()
+	m.result.Provider = "openai"
+	m.result.LLMProvider = "openai"
+	m.result.Endpoint = "https://api.openai.com/v1"
+	m.result.LLMEndpoint = "https://api.openai.com/v1"
+	m.step = stepAPIKey
+	m.focus = focusEmbed
+	m.embedKeyInput.SetValue("sk-test-key")
+	m.embedKeyInput.Focus()
+
+	// Enter on embed API key — should pre-fill LLM API key
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(InitModel)
+
+	if m.focus != focusLLM {
+		t.Errorf("expected focus to move to focusLLM")
+	}
+	if m.result.APIKey != "sk-test-key" {
+		t.Errorf("expected embed API key sk-test-key, got %s", m.result.APIKey)
+	}
+	if m.llmKeyInput.Value() != "sk-test-key" {
+		t.Errorf("expected LLM API key pre-filled, got %s", m.llmKeyInput.Value())
+	}
+}
+
+func TestInitModelFullFlowOllama(t *testing.T) {
 	m := NewInitModel()
 
-	// Select ollama
-	m.result.Provider = "ollama"
-	m.step = stepEndpoint
-	m.endpInput.SetValue("http://localhost:11434")
+	// Step 1: Select embed provider (ollama)
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(InitModel)
+	// Select LLM provider (ollama, pre-selected)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(InitModel)
 
-	// Press enter to advance from endpoint - should skip API key for ollama and go to Embed Model
-	// Also triggers async fetch
+	if m.step != stepEndpoint || m.focus != focusEmbed {
+		t.Fatalf("expected stepEndpoint/focusEmbed, got step=%d focus=%d", m.step, m.focus)
+	}
+
+	// Step 2: Embed endpoint
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(InitModel)
+	// LLM endpoint (pre-filled)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(InitModel)
+
+	if m.step != stepAPIKey || m.focus != focusEmbed {
+		t.Fatalf("expected stepAPIKey/focusEmbed, got step=%d focus=%d", m.step, m.focus)
+	}
+
+	// Step 3: Embed API key (skip)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(InitModel)
+	// LLM API key (skip) — should trigger Ollama fetch and move to model step
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(InitModel)
 
-	if m.step != stepModel {
-		t.Errorf("expected embed model step for ollama (skip API key), got step %d", m.step)
+	if m.step != stepModel || m.focus != focusEmbed {
+		t.Fatalf("expected stepModel/focusEmbed, got step=%d focus=%d", m.step, m.focus)
 	}
-	if !m.fetchingModels {
-		t.Error("expected fetchingModels to be true for ollama")
+	if !m.embedFetching {
+		t.Error("expected embedFetching to be true for ollama")
 	}
 	if cmd == nil {
-		t.Error("expected a fetch command for ollama")
+		t.Error("expected fetch command for ollama")
 	}
 
-	// Simulate fetch error (Ollama not running) — falls back to text input
-	updated, _ = m.Update(ollamaModelsMsg{err: fmt.Errorf("connection refused")})
-	m = updated.(InitModel)
-
-	if m.fetchingModels {
-		t.Error("expected fetchingModels to be false after msg")
-	}
-	if m.fetchErr == nil {
-		t.Error("expected fetchErr to be set")
-	}
-
-	// Now text input should work as before
-	m.modelInput.SetValue("nomic-embed-text")
-	m.modelInput.Focus()
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m = updated.(InitModel)
-
-	if m.step != stepLLMModel {
-		t.Errorf("expected LLM model step after embed model, got step %d", m.step)
-	}
-
-	// Press enter to advance from LLM model to confirm
-	m.llmInput.SetValue("llama3.2")
-	m.llmInput.Focus()
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m = updated.(InitModel)
-
-	if m.step != stepConfirm {
-		t.Errorf("expected confirm step after LLM model, got step %d", m.step)
-	}
-	if m.result.LLMModel != "llama3.2" {
-		t.Errorf("expected LLM model llama3.2, got %s", m.result.LLMModel)
-	}
-}
-
-func TestInitModelOllamaModelListSelection(t *testing.T) {
-	m := NewInitModel()
-	m.result.Provider = "ollama"
-	m.result.Endpoint = "http://localhost:11434"
-	m.step = stepModel
-	m.fetchingModels = true
-
-	// Simulate successful fetch with embed + LLM models
-	updated, _ := m.Update(ollamaModelsMsg{
-		models: []string{"llama3.2:latest", "nomic-embed-text:latest", "qwen3.5:2b"},
+	// Simulate embed fetch returning models
+	updated, _ = m.Update(ollamaEmbedModelsMsg{
+		models: []string{"nomic-embed-text:latest", "llama3.2:latest"},
 	})
 	m = updated.(InitModel)
 
-	if len(m.embedModels) != 1 {
-		t.Errorf("expected 1 embed model, got %d", len(m.embedModels))
-	}
-	if len(m.llmModels) != 2 {
-		t.Errorf("expected 2 LLM models, got %d", len(m.llmModels))
+	if len(m.embedModelList) != 1 {
+		t.Errorf("expected 1 embed model, got %d", len(m.embedModelList))
 	}
 
-	// Embed model list: cursor at 0 (first embed model)
-	if m.embedCursor != 0 {
-		t.Errorf("expected embedCursor 0, got %d", m.embedCursor)
-	}
-
-	// Select the first embed model
+	// Select embed model
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(InitModel)
 
 	if m.result.Model != "nomic-embed-text:latest" {
-		t.Errorf("expected nomic-embed-text:latest, got %s", m.result.Model)
+		t.Errorf("expected embed model nomic-embed-text:latest, got %s", m.result.Model)
 	}
-	if m.step != stepLLMModel {
-		t.Errorf("expected stepLLMModel, got step %d", m.step)
+	if m.focus != focusLLM {
+		t.Errorf("expected focus to move to focusLLM for LLM model")
 	}
 
-	// Navigate LLM model list: down to second model
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	// Simulate LLM fetch returning models
+	updated, _ = m.Update(ollamaLLMModelsMsg{
+		models: []string{"nomic-embed-text:latest", "llama3.2:latest", "qwen3.5:2b"},
+	})
 	m = updated.(InitModel)
-	if m.llmCursor != 1 {
-		t.Errorf("expected llmCursor 1, got %d", m.llmCursor)
+
+	if len(m.llmModelList) != 2 {
+		t.Errorf("expected 2 LLM models, got %d", len(m.llmModelList))
 	}
 
-	// Select second LLM model
+	// Select first LLM model
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(InitModel)
 
-	if m.result.LLMModel != "qwen3.5:2b" {
-		t.Errorf("expected qwen3.5:2b, got %s", m.result.LLMModel)
+	if m.result.LLMModel != "llama3.2:latest" {
+		t.Errorf("expected LLM model llama3.2:latest, got %s", m.result.LLMModel)
 	}
 	if m.step != stepConfirm {
 		t.Errorf("expected stepConfirm, got step %d", m.step)
 	}
 }
 
+func TestInitModelOllamaFetchError(t *testing.T) {
+	m := NewInitModel()
+	m.result.Provider = "ollama"
+	m.result.LLMProvider = "ollama"
+	m.result.Endpoint = "http://localhost:11434"
+	m.result.LLMEndpoint = "http://localhost:11434"
+	m.step = stepModel
+	m.focus = focusEmbed
+	m.embedFetching = true
+
+	// Simulate fetch error — should fall back to text input
+	updated, _ := m.Update(ollamaEmbedModelsMsg{err: fmt.Errorf("connection refused")})
+	m = updated.(InitModel)
+
+	if m.embedFetching {
+		t.Error("expected embedFetching to be false after error")
+	}
+	if m.embedFetchErr == nil {
+		t.Error("expected embedFetchErr to be set")
+	}
+
+	// Text input should work
+	m.embedModelInput.SetValue("nomic-embed-text")
+	m.embedModelInput.Focus()
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(InitModel)
+
+	if m.result.Model != "nomic-embed-text" {
+		t.Errorf("expected model nomic-embed-text, got %s", m.result.Model)
+	}
+	if m.focus != focusLLM {
+		t.Errorf("expected focus to move to focusLLM")
+	}
+}
+
 func TestInitModelOllamaCustomModelFallback(t *testing.T) {
 	m := NewInitModel()
 	m.result.Provider = "ollama"
+	m.result.LLMProvider = "ollama"
 	m.result.Endpoint = "http://localhost:11434"
+	m.result.LLMEndpoint = "http://localhost:11434"
 	m.step = stepModel
+	m.focus = focusEmbed
 
 	// Simulate fetch with one embed model
-	updated, _ := m.Update(ollamaModelsMsg{
+	updated, _ := m.Update(ollamaEmbedModelsMsg{
 		models: []string{"nomic-embed-text:latest", "llama3.2:latest"},
 	})
 	m = updated.(InitModel)
@@ -464,16 +561,16 @@ func TestInitModelOllamaCustomModelFallback(t *testing.T) {
 	// Navigate to "Type custom name..." (index 1 = after the 1 embed model)
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = updated.(InitModel)
-	if m.embedCursor != 1 {
-		t.Errorf("expected embedCursor 1, got %d", m.embedCursor)
+	if m.embedModelCursor != 1 {
+		t.Errorf("expected embedModelCursor 1, got %d", m.embedModelCursor)
 	}
 
 	// Select "Custom" — should switch to text input
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(InitModel)
 
-	if len(m.embedModels) != 0 {
-		t.Error("expected embedModels cleared for custom fallback")
+	if len(m.embedModelList) != 0 {
+		t.Error("expected embedModelList cleared for custom fallback")
 	}
 	if m.step != stepModel {
 		t.Errorf("expected to stay on stepModel for text input, got step %d", m.step)
@@ -488,7 +585,8 @@ func TestInitModelOllamaFetchingView(t *testing.T) {
 	m.result.Provider = "ollama"
 	m.result.Endpoint = "http://localhost:11434"
 	m.step = stepModel
-	m.fetchingModels = true
+	m.focus = focusEmbed
+	m.embedFetching = true
 
 	view := m.View()
 	if !strings.Contains(view, "Fetching models from Ollama") {
@@ -501,8 +599,9 @@ func TestInitModelOllamaModelListView(t *testing.T) {
 	m.result.Provider = "ollama"
 	m.result.Endpoint = "http://localhost:11434"
 	m.step = stepModel
-	m.embedModels = []string{"nomic-embed-text:latest", "mxbai-embed-large:latest"}
-	m.embedCursor = 0
+	m.focus = focusEmbed
+	m.embedModelList = []string{"nomic-embed-text:latest", "mxbai-embed-large:latest"}
+	m.embedModelCursor = 0
 
 	view := m.View()
 	if !strings.Contains(view, "nomic-embed-text:latest") {
@@ -519,18 +618,25 @@ func TestInitModelOllamaModelListView(t *testing.T) {
 func TestInitModelLMStudioNoFetch(t *testing.T) {
 	m := NewInitModel()
 	m.result.Provider = "lmstudio"
-	m.step = stepEndpoint
-	m.endpInput.SetValue("http://localhost:1234")
+	m.result.LLMProvider = "lmstudio"
+	m.result.Endpoint = "http://localhost:1234"
+	m.result.LLMEndpoint = "http://localhost:1234"
+	m.step = stepAPIKey
+	m.focus = focusLLM
+	m.llmKeyInput.Focus()
 
-	// Press enter — should NOT trigger fetch for lmstudio
+	// Enter on LLM API key — should move to model step without triggering fetch
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(InitModel)
 
 	if m.step != stepModel {
 		t.Errorf("expected stepModel, got step %d", m.step)
 	}
-	if m.fetchingModels {
-		t.Error("expected fetchingModels to be false for lmstudio")
+	if m.embedFetching {
+		t.Error("expected embedFetching to be false for lmstudio")
+	}
+	if m.llmFetching {
+		t.Error("expected llmFetching to be false for lmstudio")
 	}
 }
 

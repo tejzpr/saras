@@ -43,7 +43,10 @@ func init() {
 	initCmd.Flags().String("model", "", "Embedding model name")
 	initCmd.Flags().String("endpoint", "", "API endpoint URL")
 	initCmd.Flags().String("api-key", "", "API key (for openai provider)")
+	initCmd.Flags().String("llm-provider", "", "LLM provider (ollama, lmstudio, openai; defaults to embedding provider)")
 	initCmd.Flags().String("llm-model", "", "LLM model for chat/ask (e.g. llama3.2, gpt-4o-mini)")
+	initCmd.Flags().String("llm-endpoint", "", "LLM API endpoint URL (defaults to embedding endpoint)")
+	initCmd.Flags().String("llm-api-key", "", "LLM API key (defaults to embedding API key)")
 	initCmd.Flags().Bool("no-index", false, "Skip initial indexing after setup")
 }
 
@@ -195,14 +198,20 @@ func buildNonInteractiveResult(cmd *cobra.Command) tui.InitResult {
 	model, _ := cmd.Flags().GetString("model")
 	endpoint, _ := cmd.Flags().GetString("endpoint")
 	apiKey, _ := cmd.Flags().GetString("api-key")
+	llmProvider, _ := cmd.Flags().GetString("llm-provider")
 	llmModel, _ := cmd.Flags().GetString("llm-model")
+	llmEndpoint, _ := cmd.Flags().GetString("llm-endpoint")
+	llmAPIKey, _ := cmd.Flags().GetString("llm-api-key")
 
 	if provider == "" {
 		provider = "ollama"
 	}
+	if llmProvider == "" {
+		llmProvider = provider
+	}
 
 	embedDefaults := config.DefaultEmbedderForProvider(provider)
-	llmDefaults := config.DefaultLLMForProvider(provider)
+	llmDefaults := config.DefaultLLMForProvider(llmProvider)
 
 	if model == "" {
 		model = embedDefaults.Model
@@ -214,11 +223,18 @@ func buildNonInteractiveResult(cmd *cobra.Command) tui.InitResult {
 		llmModel = llmDefaults.Model
 	}
 
-	// Use the user-provided endpoint for LLM too; fall back to default only
-	// when the user didn't supply one (i.e. endpoint came from embedder defaults).
-	llmEndpoint := endpoint
-	if llmEndpoint == embedDefaults.Endpoint {
-		llmEndpoint = llmDefaults.Endpoint
+	// Use explicit --llm-endpoint if provided; otherwise fall back to
+	// the embedding endpoint (or provider default if that wasn't customised).
+	if llmEndpoint == "" {
+		llmEndpoint = endpoint
+		if llmEndpoint == embedDefaults.Endpoint {
+			llmEndpoint = llmDefaults.Endpoint
+		}
+	}
+
+	// Use explicit --llm-api-key if provided; otherwise inherit embedding key.
+	if llmAPIKey == "" {
+		llmAPIKey = apiKey
 	}
 
 	return tui.InitResult{
@@ -226,8 +242,10 @@ func buildNonInteractiveResult(cmd *cobra.Command) tui.InitResult {
 		Model:       model,
 		Endpoint:    endpoint,
 		APIKey:      apiKey,
+		LLMProvider: llmProvider,
 		LLMModel:    llmModel,
 		LLMEndpoint: llmEndpoint,
+		LLMAPIKey:   llmAPIKey,
 		Done:        true,
 	}
 }
@@ -246,14 +264,12 @@ func buildConfigFromResult(result tui.InitResult) *config.Config {
 	}
 
 	// LLM config for ask/explain
-	cfg.LLM.Provider = result.Provider
+	cfg.LLM.Provider = result.LLMProvider
 	cfg.LLM.Model = result.LLMModel
 	if result.LLMEndpoint != "" {
 		cfg.LLM.Endpoint = result.LLMEndpoint
 	}
-	if result.Provider == "openai" {
-		cfg.LLM.APIKey = result.APIKey
-	}
+	cfg.LLM.APIKey = result.LLMAPIKey
 
 	return cfg
 }
